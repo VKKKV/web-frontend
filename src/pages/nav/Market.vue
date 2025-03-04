@@ -26,9 +26,21 @@ onUnmounted(() => {
 
 <template>
   <div class="p-4">
-<!--    <div id="chart"  style="width:600px;height:600px" />-->
-    <div id="chart"  class="h-[600px] w-full"/>
-    <el-row :gutter="20" class="mt-4">
+    <!--    <div id="chart"  style="width:600px;height:600px" />-->
+    <div id="chart" class="h-[600px] w-full" />
+    <el-card>
+      <template #header>
+        <div class="font-bold">
+          实时数据
+        </div>
+      </template>
+      <el-table :data="realtimeData" height="200">
+        <el-table-column prop="time" label="时间" />
+        <el-table-column prop="price" label="价格" />
+        <el-table-column prop="volume" label="成交量" />
+      </el-table>
+    </el-card>
+    <!-- <el-row :gutter="20" class="mt-4">
       <el-col :span="8">
         <el-card>
           <template #header>
@@ -58,7 +70,7 @@ onUnmounted(() => {
           </el-table>
         </el-card>
       </el-col>
-    </el-row>
+    </el-row> -->
   </div>
 </template>
 

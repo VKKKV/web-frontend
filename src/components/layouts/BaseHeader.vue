@@ -21,6 +21,13 @@ import { toggleDark } from '~/composables'
       </template>
     </el-menu-item>
 
+    <el-menu-item index="/nav/Test">
+      <el-icon>
+        <data-analysis/>
+      </el-icon>
+      <span>TEST</span>
+    </el-menu-item>
+
     <el-menu-item index="/nav/Market">
       <el-icon>
         <data-analysis/>
