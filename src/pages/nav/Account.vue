@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
+import axios from 'axios'
+import { useAuth } from '../../composables/useAuth'
 
 interface User {
   username: string
@@ -15,14 +18,21 @@ interface PasswordForm {
   confirmPassword: string
 }
 
+interface ApiError {
+  message: string
+  [key: string]: any
+}
+
+const router = useRouter()
+const { checkAuth, userId: authUserId } = useAuth()
+
 // 用户信息状态
 const userInfo = ref<User>({
   username: '',
   email: '',
   phone: ''
 })
-const loading = ref(false)
-// const loading = ref(true)
+const loading = ref(true)
 const error = ref('')
 
 // 密码修改相关
@@ -54,28 +64,35 @@ const passwordRules = ref<FormRules>({
 })
 
 // 获取用户信息
-// const fetchUserInfo = async () => {
-//   try {
-//     const token = localStorage.getItem('token')
-//     const userId = localStorage.getItem('userId')
+const fetchUserInfo = async () => {
+  loading.value = true
+  error.value = ''
+  
+  try {
+    if (!authUserId.value) {
+      throw new Error('未登录')
+    }
     
-//     const response = await fetch(`/api/v1/users/${userId}`, {
-//       headers: {
-//         'Authorization': `Bearer ${token}`
-//       }
-//     })
+    const response = await axios.get(`/api/v1/users/${authUserId.value}`)
+    if (response.data.code === 200) {
+      userInfo.value = response.data.data
+    } else {
+      throw new Error(response.data.message || '获取用户信息失败')
+    }
+  } catch (err: any) {
+    console.error('获取用户信息出错:', err)
+    error.value = err.message
     
-//     if (!response.ok) throw new Error('获取信息失败')
-    
-//     const data = await response.json()
-//     userInfo.value = data.data
-//   } catch (err) {
-//     error.value = err.message
-//     ElMessage.error('获取用户信息失败')
-//   } finally {
-//     loading.value = false
-//   }
-// }
+    if (err.message === '未登录') {
+      ElMessage.warning('请先登录')
+      router.push('/login')
+    } else {
+      ElMessage.error(err.response?.data?.message || '获取用户信息失败')
+    }
+  } finally {
+    loading.value = false
+  }
+}
 
 // 修改密码
 const handleUpdatePassword = async (formEl: FormInstance | undefined) => {
@@ -90,56 +107,90 @@ const handleUpdatePassword = async (formEl: FormInstance | undefined) => {
           type: 'warning'
         })
 
-        const response = await fetch('/api/v1/users/update-password', {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            old_password: passwordForm.value.oldPassword,
-            new_password: passwordForm.value.newPassword
-          })
+        if (!authUserId.value) {
+          throw new Error('未登录')
+        }
+
+        const response = await axios.put('/api/v1/users/update-password', {
+          userId: parseInt(authUserId.value),
+          oldPassword: passwordForm.value.oldPassword,
+          newPassword: passwordForm.value.newPassword
         })
 
-        if (!response.ok) throw new Error('密码修改失败')
+        if (response.data.code === 200) {
+          ElMessage.success('密码修改成功')
+          passwordFormRef.value?.resetFields()
+        } else {
+          throw new Error(response.data.message || '修改密码失败')
+        }
+      } catch (err: any) {
+        console.error('修改密码出错:', err)
         
-        ElMessage.success('密码修改成功')
-        passwordFormRef.value?.resetFields()
-      } catch (err) {
-        ElMessage.error(err.message)
+        if (err.message === '未登录') {
+          ElMessage.warning('请先登录')
+          router.push('/login')
+        } else {
+          ElMessage.error(err.response?.data?.message || '修改密码失败')
+        }
       }
     }
   })
 }
 
-// onMounted(() => {
-//   if (localStorage.getItem('token')) {
-//     fetchUserInfo()
-//   } else {
-//     ElMessage.warning('请先登录')
-//     // 这里可以跳转到登录页面
-//   }
-// })
+// 添加自动刷新功能
+let refreshTimer: number | null = null
+
+const startAutoRefresh = () => {
+  // 每5分钟刷新一次用户信息
+  refreshTimer = window.setInterval(() => {
+    if (checkAuth()) {
+      fetchUserInfo()
+    }
+  }, 5 * 60 * 1000)
+}
+
+onMounted(() => {
+  // 检查是否已登录
+  if (checkAuth()) {
+    fetchUserInfo()
+    startAutoRefresh()
+  }
+})
+
+// 组件卸载时清除定时器
+onUnmounted(() => {
+  if (refreshTimer) {
+    clearInterval(refreshTimer)
+  }
+})
 </script>
 
 <template>
-  <div class="account-container">
-    <el-card v-loading="loading">
+  <div class="account-container bg-gray-900 min-h-screen py-8">
+    <el-card v-loading="loading" class="bg-gray-800 border-gray-700 text-white">
       <template #header>
         <div class="card-header">
-          <span class="text-xl">账户信息</span>
+          <span class="text-xl text-white">账户信息</span>
           <el-tag type="success" effect="dark">已认证</el-tag>
         </div>
       </template>
 
-      <el-descriptions border :column="1">
+      <!-- 错误提示 -->
+      <el-alert
+        v-if="error"
+        :title="error"
+        type="error"
+        show-icon
+        class="mb-4"
+      />
+
+      <el-descriptions border :column="1" class="user-info">
         <el-descriptions-item label="用户名">{{ userInfo.username }}</el-descriptions-item>
         <el-descriptions-item label="邮箱">{{ userInfo.email }}</el-descriptions-item>
         <el-descriptions-item label="手机号">{{ userInfo.phone }}</el-descriptions-item>
       </el-descriptions>
 
-      <el-divider />
+      <el-divider border-style="dashed" class="bg-gray-700" />
 
       <el-form 
         ref="passwordFormRef"
@@ -191,7 +242,7 @@ const handleUpdatePassword = async (formEl: FormInstance | undefined) => {
 <style scoped>
 .account-container {
   max-width: 800px;
-  margin: 20px auto;
+  margin: 0 auto;
   padding: 20px;
 }
 
@@ -204,5 +255,33 @@ const handleUpdatePassword = async (formEl: FormInstance | undefined) => {
 .password-form {
   margin-top: 30px;
   max-width: 600px;
+}
+
+:deep(.el-descriptions__label) {
+  background-color: #2d3748;
+  color: #e2e8f0;
+  font-weight: 500;
+}
+
+:deep(.el-descriptions__content) {
+  color: #f7fafc;
+  background-color: #1a202c;
+}
+
+:deep(.el-descriptions__body) {
+  border-color: #4a5568;
+}
+
+:deep(.el-form-item__label) {
+  color: #e2e8f0;
+}
+
+:deep(.el-input__wrapper) {
+  background-color: #2d3748;
+  border-color: #4a5568;
+}
+
+:deep(.el-input__inner) {
+  color: #f7fafc;
 }
 </style>
