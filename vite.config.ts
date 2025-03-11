@@ -52,6 +52,22 @@ export default defineConfig({
     Unocss(),
   ],
 
+  // 添加WebSocket代理配置
+  server: {
+    proxy: {
+      '/ws': {
+        target: 'ws://localhost:8080',
+        ws: true,
+        changeOrigin: true,
+      },
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        rewrite: (path) => path
+      }
+    },
+  },
+
   ssr: {
     // TODO: workaround until they support native ESM
     noExternal: ['element-plus'],
