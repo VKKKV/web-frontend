@@ -10,9 +10,7 @@ import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import ElementPlus from 'element-plus'
 // if you do not need ssg:
 import { createApp } from 'vue'
-import { createRouter, createWebHistory } from 'vue-router'
-
-import { routes } from 'vue-router/auto-routes'
+import router from './router'
 
 import App from './App.vue'
 // import all element css, uncommented next line
@@ -25,10 +23,7 @@ import 'element-plus/theme-chalk/src/message.scss'
 import 'element-plus/theme-chalk/src/message-box.scss'
 
 const app = createApp(App)
-app.use(createRouter({
-  history: createWebHistory(),
-  routes,
-}))
+app.use(router)
 
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)
