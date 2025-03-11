@@ -1,7 +1,25 @@
 <script lang="ts" setup>
-import { repository } from '~/../package.json'
-
+import { onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { toggleDark } from '~/composables'
+import { useAuth } from '~/composables/useAuth'
+
+const router = useRouter()
+const { isLoggedIn, username, logout, initAuth } = useAuth()
+
+// 初始化登录状态
+onMounted(() => {
+  initAuth()
+})
+
+// 处理用户菜单点击
+const handleUserClick = () => {
+  if (isLoggedIn.value) {
+    router.push('/nav/account')
+  } else {
+    router.push('/login')
+  }
+}
 </script>
 
 <template>
@@ -9,7 +27,7 @@ import { toggleDark } from '~/composables'
     <el-menu-item index="/">
       <div class="flex items-center justify-center gap-2">
         <div class="text-xl" i-ep-element-plus/>
-        <span>Element Plus</span>
+        <span>StockVision</span>
       </div>
     </el-menu-item>
     <el-menu-item index="/">
@@ -21,18 +39,18 @@ import { toggleDark } from '~/composables'
       </template>
     </el-menu-item>
 
-    <el-menu-item index="/nav/Test">
-      <el-icon>
-        <data-analysis/>
-      </el-icon>
-      <span>TEST</span>
-    </el-menu-item>
-
     <el-menu-item index="/nav/Market">
       <el-icon>
         <data-analysis/>
       </el-icon>
-      <span>行情中心</span>
+      <span>行情图表</span>
+    </el-menu-item>
+
+    <el-menu-item index="/nav/StockInfo">
+      <el-icon>
+        <info-filled/>
+      </el-icon>
+      <span>股票信息</span>
     </el-menu-item>
 
     <el-menu-item index="/nav/Trade">
@@ -42,11 +60,21 @@ import { toggleDark } from '~/composables'
       <span>交易</span>
     </el-menu-item>
 
-    <el-menu-item index="/nav/account">
+    <!-- 用户入口 - 未登录时点击进入登录页，已登录时点击进入账户页 -->
+    <el-menu-item @click="handleUserClick">
       <el-icon>
         <user/>
       </el-icon>
-      <span>我的账户</span>
+      <span v-if="!isLoggedIn">用户登录</span>
+      <span v-else>{{ username }}</span>
+    </el-menu-item>
+
+    <!-- 已登录状态显示退出按钮 -->
+    <el-menu-item v-if="isLoggedIn" @click="logout">
+      <el-icon>
+        <switch-button/>
+      </el-icon>
+      <span>退出</span>
     </el-menu-item>
 
     <el-menu-item h="full" @click="toggleDark()">
