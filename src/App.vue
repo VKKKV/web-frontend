@@ -2,7 +2,6 @@
   <el-config-provider namespace="ep">
     <BaseHeader />
     <div class="main-container flex">
-<!--      <BaseSide />-->
       <div w="full" py="4">
         <RouterView />
       </div>
@@ -18,5 +17,6 @@
 
 .main-container {
   height: calc(100vh - var(--ep-menu-item-height) - 4px);
+  padding-top: var(--ep-menu-item-height);
 }
 </style>
