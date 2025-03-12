@@ -119,7 +119,6 @@ function createWebSocketConnection() {
     if (ws.value && ws.value.readyState !== WebSocket.CLOSED) {
       ws.value.close()
     }
-    
     // 创建新连接
     ws.value = new WebSocket('ws://' + window.location.host + '/ws/v1/market/subscribe')
     
