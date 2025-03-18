@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import axios from 'axios'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { onMounted, onUnmounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuth } from '../../composables/useAuth'
 
 interface User {
@@ -30,7 +30,7 @@ const { checkAuth, userId: authUserId } = useAuth()
 const userInfo = ref<User>({
   username: '',
   email: '',
-  phone: ''
+  phone: '',
 })
 const loading = ref(true)
 const error = ref('')
@@ -40,63 +40,68 @@ const passwordFormRef = ref<FormInstance>()
 const passwordForm = ref<PasswordForm>({
   oldPassword: '',
   newPassword: '',
-  confirmPassword: ''
+  confirmPassword: '',
 })
 
 // 表单验证规则
 const passwordRules = ref<FormRules>({
   oldPassword: [
-    { required: true, message: '请输入原密码', trigger: 'blur' }
+    { required: true, message: '请输入原密码', trigger: 'blur' },
   ],
   newPassword: [
     { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 8, message: '密码长度至少8位', trigger: 'blur' }
   ],
   confirmPassword: [
     { validator: (rule, value, callback) => {
       if (value !== passwordForm.value.newPassword) {
         callback(new Error('两次输入密码不一致'))
-      } else {
+      }
+      else {
         callback()
       }
-    }, trigger: 'blur' }
-  ]
+    }, trigger: 'blur' },
+  ],
 })
 
 // 获取用户信息
-const fetchUserInfo = async () => {
+async function fetchUserInfo() {
   loading.value = true
   error.value = ''
-  
+
   try {
     if (!authUserId.value) {
       throw new Error('未登录')
     }
-    
+
     const response = await axios.get(`/api/v1/users/${authUserId.value}`)
     if (response.data.code === 200) {
       userInfo.value = response.data.data
-    } else {
+    }
+    else {
       throw new Error(response.data.message || '获取用户信息失败')
     }
-  } catch (err: any) {
+  }
+  catch (err: any) {
     console.error('获取用户信息出错:', err)
     error.value = err.message
-    
+
     if (err.message === '未登录') {
       ElMessage.warning('请先登录')
       router.push('/login')
-    } else {
+    }
+    else {
       ElMessage.error(err.response?.data?.message || '获取用户信息失败')
     }
-  } finally {
+  }
+  finally {
     loading.value = false
   }
 }
 
 // 修改密码
-const handleUpdatePassword = async (formEl: FormInstance | undefined) => {
-  if (!formEl) return
+async function handleUpdatePassword(formEl: FormInstance | undefined) {
+  if (!formEl)
+    return
 
   await formEl.validate(async (valid) => {
     if (valid) {
@@ -104,7 +109,7 @@ const handleUpdatePassword = async (formEl: FormInstance | undefined) => {
         await ElMessageBox.confirm('确定要修改密码吗？', '安全验证', {
           confirmButtonText: '确定',
           cancelButtonText: '取消',
-          type: 'warning'
+          type: 'warning',
         })
 
         if (!authUserId.value) {
@@ -112,24 +117,27 @@ const handleUpdatePassword = async (formEl: FormInstance | undefined) => {
         }
 
         const response = await axios.put('/api/v1/users/update-password', {
-          userId: parseInt(authUserId.value),
+          userId: Number.parseInt(authUserId.value),
           oldPassword: passwordForm.value.oldPassword,
-          newPassword: passwordForm.value.newPassword
+          newPassword: passwordForm.value.newPassword,
         })
 
         if (response.data.code === 200) {
           ElMessage.success('密码修改成功')
           passwordFormRef.value?.resetFields()
-        } else {
+        }
+        else {
           throw new Error(response.data.message || '修改密码失败')
         }
-      } catch (err: any) {
+      }
+      catch (err: any) {
         console.error('修改密码出错:', err)
-        
+
         if (err.message === '未登录') {
           ElMessage.warning('请先登录')
           router.push('/login')
-        } else {
+        }
+        else {
           ElMessage.error(err.response?.data?.message || '修改密码失败')
         }
       }
@@ -140,7 +148,7 @@ const handleUpdatePassword = async (formEl: FormInstance | undefined) => {
 // 添加自动刷新功能
 let refreshTimer: number | null = null
 
-const startAutoRefresh = () => {
+function startAutoRefresh() {
   // 每5分钟刷新一次用户信息
   refreshTimer = window.setInterval(() => {
     if (checkAuth()) {
@@ -166,12 +174,14 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="account-container bg-gray-900 min-h-screen py-8">
-    <el-card v-loading="loading" class="bg-gray-800 border-gray-700 text-white">
+  <div class="account-container">
+    <el-card v-loading="loading" class="mx-auto max-w-2xl">
       <template #header>
         <div class="card-header">
-          <span class="text-xl text-white">账户信息</span>
-          <el-tag type="success" effect="dark">已认证</el-tag>
+          <span class="text-xl font-bold">账户信息</span>
+          <el-tag type="success" effect="dark">
+            已认证
+          </el-tag>
         </div>
       </template>
 
@@ -185,14 +195,20 @@ onUnmounted(() => {
       />
 
       <el-descriptions border :column="1" class="user-info">
-        <el-descriptions-item label="用户名">{{ userInfo.username }}</el-descriptions-item>
-        <el-descriptions-item label="邮箱">{{ userInfo.email }}</el-descriptions-item>
-        <el-descriptions-item label="手机号">{{ userInfo.phone }}</el-descriptions-item>
+        <el-descriptions-item label="用户名">
+          {{ userInfo.username }}
+        </el-descriptions-item>
+        <el-descriptions-item label="邮箱">
+          {{ userInfo.email }}
+        </el-descriptions-item>
+        <el-descriptions-item label="手机号">
+          {{ userInfo.phone }}
+        </el-descriptions-item>
       </el-descriptions>
 
       <el-divider border-style="dashed" class="bg-gray-700" />
 
-      <el-form 
+      <el-form
         ref="passwordFormRef"
         :model="passwordForm"
         :rules="passwordRules"
@@ -200,11 +216,10 @@ onUnmounted(() => {
         class="password-form"
       >
         <el-form-item label="原密码" prop="oldPassword">
-          <el-input 
+          <el-input
             v-model="passwordForm.oldPassword"
             type="password"
             show-password
-            placeholder="请输入原密码"
           />
         </el-form-item>
 
@@ -213,7 +228,6 @@ onUnmounted(() => {
             v-model="passwordForm.newPassword"
             type="password"
             show-password
-            placeholder="8位以上字母数字组合"
           />
         </el-form-item>
 
@@ -222,12 +236,11 @@ onUnmounted(() => {
             v-model="passwordForm.confirmPassword"
             type="password"
             show-password
-            placeholder="请再次输入新密码"
           />
         </el-form-item>
 
         <el-form-item>
-          <el-button 
+          <el-button
             type="primary"
             @click="handleUpdatePassword(passwordFormRef)"
           >
@@ -241,47 +254,6 @@ onUnmounted(() => {
 
 <style scoped>
 .account-container {
-  max-width: 800px;
-  margin: 0 auto;
   padding: 20px;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.password-form {
-  margin-top: 30px;
-  max-width: 600px;
-}
-
-:deep(.el-descriptions__label) {
-  background-color: #2d3748;
-  color: #e2e8f0;
-  font-weight: 500;
-}
-
-:deep(.el-descriptions__content) {
-  color: #f7fafc;
-  background-color: #1a202c;
-}
-
-:deep(.el-descriptions__body) {
-  border-color: #4a5568;
-}
-
-:deep(.el-form-item__label) {
-  color: #e2e8f0;
-}
-
-:deep(.el-input__wrapper) {
-  background-color: #2d3748;
-  border-color: #4a5568;
-}
-
-:deep(.el-input__inner) {
-  color: #f7fafc;
 }
 </style>
