@@ -53,7 +53,13 @@ async function handleLogin() {
         ElMessage.success('登录成功')
 
         // 跳转到上次访问的页面或首页
-        redirectAfterLogin()
+        // redirectAfterLogin()
+
+        setTimeout(() => {
+          redirectAfterLogin()
+
+          window.location.reload()
+        }, 1000)
       }
       catch (error) {
         console.error('登录出错:', error)
@@ -79,7 +85,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="login-container min-h-screen flex items-center justify-center bg-gray-900">
+  <div class="login-container min-h-screen flex items-center justify-center">
     <div class="login-box max-w-md w-full border border-gray-700 rounded-lg bg-gray-800 p-8 shadow-xl">
       <div class="mb-8 text-center">
         <h2 class="text-3xl text-white font-bold">
@@ -115,12 +121,12 @@ onMounted(() => {
           />
         </el-form-item>
 
-        <div class="mb-6 flex items-center justify-between">
-          <el-checkbox label="记住我" />
-          <el-button type="text" class="text-blue-400 hover:text-blue-500">
-            忘记密码？
-          </el-button>
-        </div>
+<!--        <div class="mb-6 flex items-center justify-between">-->
+<!--          <el-checkbox label="记住我" />-->
+<!--          <el-button type="text" class="text-blue-400 hover:text-blue-500">-->
+<!--            忘记密码？-->
+<!--          </el-button>-->
+<!--        </div>-->
 
         <el-button
           type="primary"
@@ -141,29 +147,3 @@ onMounted(() => {
     </div>
   </div>
 </template>
-
-<style scoped>
-.login-container {
-  background-image: linear-gradient(to right bottom, rgba(17, 24, 39, 0.95), rgba(17, 24, 39, 0.95)),
-    url('https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?q=80&w=1470&auto=format&fit=crop');
-  background-size: cover;
-  background-position: center;
-}
-
-:deep(.el-form-item__label) {
-  color: #e2e8f0;
-}
-
-:deep(.el-input__wrapper) {
-  background-color: #2d3748;
-  border-color: #4a5568;
-}
-
-:deep(.el-input__inner) {
-  color: #f7fafc;
-}
-
-:deep(.el-checkbox__label) {
-  color: #e2e8f0;
-}
-</style>

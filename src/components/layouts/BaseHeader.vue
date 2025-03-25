@@ -13,10 +13,11 @@ onMounted(() => {
 })
 
 // 处理用户菜单点击
-const handleUserClick = () => {
+function handleUserClick() {
   if (isLoggedIn.value) {
     router.push('/nav/account')
-  } else {
+  }
+  else {
     router.push('/login')
   }
 }
@@ -26,14 +27,14 @@ const handleUserClick = () => {
   <el-menu class="el-menu-demo" mode="horizontal" :ellipsis="false" router>
     <el-menu-item index="/">
       <div class="flex items-center justify-center gap-2">
-        <div class="text-xl" i-ep-element-plus/>
+        <div class="text-xl" i-ep-element-plus />
         <span>StockVision</span>
       </div>
     </el-menu-item>
     <el-menu-item index="/">
       <template #title>
         <el-icon>
-          <home-filled/>
+          <home-filled />
         </el-icon>
         <span>首页</span>
       </template>
@@ -41,21 +42,21 @@ const handleUserClick = () => {
 
     <el-menu-item index="/nav/Market">
       <el-icon>
-        <data-analysis/>
+        <data-analysis />
       </el-icon>
       <span>行情图表</span>
     </el-menu-item>
 
     <el-menu-item index="/nav/StockInfo">
       <el-icon>
-        <info-filled/>
+        <info-filled />
       </el-icon>
       <span>股票信息</span>
     </el-menu-item>
 
     <el-menu-item index="/nav/Trade">
       <el-icon>
-        <shopping-cart/>
+        <shopping-cart />
       </el-icon>
       <span>交易</span>
     </el-menu-item>
@@ -63,7 +64,7 @@ const handleUserClick = () => {
     <!-- 用户入口 - 未登录时点击进入登录页，已登录时点击进入账户页 -->
     <el-menu-item @click="handleUserClick">
       <el-icon>
-        <user/>
+        <user />
       </el-icon>
       <span v-if="!isLoggedIn">用户登录</span>
       <span v-else>{{ username }}</span>
@@ -72,7 +73,7 @@ const handleUserClick = () => {
     <!-- 已登录状态显示退出按钮 -->
     <el-menu-item v-if="isLoggedIn" @click="logout">
       <el-icon>
-        <switch-button/>
+        <switch-button />
       </el-icon>
       <span>退出</span>
     </el-menu-item>
@@ -82,10 +83,9 @@ const handleUserClick = () => {
         class="w-full cursor-pointer border-none bg-transparent"
         style="height: var(--ep-menu-item-height)"
       >
-        <i inline-flex i="dark:ep-moon ep-sunny"/>
+        <i inline-flex i="dark:ep-moon ep-sunny" />
       </button>
     </el-menu-item>
-
   </el-menu>
 </template>
 

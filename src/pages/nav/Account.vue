@@ -6,6 +6,8 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../../composables/useAuth'
 
+const { logout } = useAuth()
+
 interface User {
   username: string
   email: string
@@ -17,12 +19,6 @@ interface PasswordForm {
   newPassword: string
   confirmPassword: string
 }
-
-interface ApiError {
-  message: string
-  [key: string]: any
-}
-
 const router = useRouter()
 const { checkAuth, userId: authUserId } = useAuth()
 
@@ -124,7 +120,8 @@ async function handleUpdatePassword(formEl: FormInstance | undefined) {
 
         if (response.data.code === 200) {
           ElMessage.success('密码修改成功')
-          passwordFormRef.value?.resetFields()
+          // passwordFormRef.value?.resetFields()
+          logout()
         }
         else {
           throw new Error(response.data.message || '修改密码失败')
@@ -206,7 +203,7 @@ onUnmounted(() => {
         </el-descriptions-item>
       </el-descriptions>
 
-      <el-divider border-style="dashed" class="bg-gray-700" />
+      <el-divider border-style="dashed" />
 
       <el-form
         ref="passwordFormRef"
