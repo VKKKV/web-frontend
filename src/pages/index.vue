@@ -83,7 +83,7 @@ const advantages = [
 </script>
 
 <template>
-  <div class="stock-home bg-gray-900">
+  <div class="stock-home ">
     <!-- 主页横幅 -->
     <div class="from-blue-600 to-indigo-800 bg-gradient-to-r text-white">
       <div class="mx-auto px-4 py-20 container md:py-32">
@@ -110,18 +110,18 @@ const advantages = [
     </div>
 
     <!-- 核心功能 -->
-    <div class="bg-gray-900 py-16">
+    <div class=" py-16">
       <div class="mx-auto px-4 container">
-        <h2 class="mb-12 text-center text-3xl text-white font-bold">
+        <h2 class="mb-12 text-center text-3xl  font-bold">
           核心功能
         </h2>
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-4 md:grid-cols-2">
           <div
             v-for="(feature, index) in features"
             :key="index"
-            class="overflow-hidden border border-gray-700 rounded-lg bg-gray-800 shadow-md transition-shadow hover:shadow-lg"
+            class="overflow-hidden border  shadow-md transition-shadow hover:shadow-lg"
           >
-            <div :class="`bg-gradient-to-r ${feature.color} p-6 text-white`">
+            <div :class="`bg-gradient-to-r ${feature.color} p-6 `">
               <component :is="feature.icon" class="mb-4 text-4xl" />
               <h3 class="mb-2 text-xl font-semibold">
                 {{ feature.title }}
@@ -144,23 +144,23 @@ const advantages = [
     </div>
 
     <!-- 平台介绍 -->
-    <div class="bg-gray-800 py-16">
+    <div class="py-16">
       <div class="mx-auto px-4 container">
         <div class="flex flex-col items-center md:flex-row">
           <div class="mb-8 md:mb-0 md:w-1/2 md:pr-8">
-            <h2 class="mb-6 text-3xl text-white font-bold">
+            <h2 class="mb-6 text-3xl  font-bold">
               为什么选择 StockVision
             </h2>
-            <p class="mb-6 text-gray-300">
+            <p class="mb-6 ">
               StockVision 是一个专业的股票交易平台，致力于为投资者提供安全、高效、专业的交易体验。
               我们的平台采用先进的技术架构，提供毫秒级的行情推送和交易执行，帮助您把握每一次市场机会。
             </p>
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div v-for="(adv, index) in advantages" :key="index" class="border-l-4 border-blue-500 py-2 pl-4">
-                <h4 class="text-lg text-white font-semibold">
+                <h4 class="text-lg font-semibold">
                   {{ adv.title }}
                 </h4>
-                <p class="text-sm text-gray-300">
+                <p class="text-sm">
                   {{ adv.description }}
                 </p>
               </div>
@@ -170,7 +170,7 @@ const advantages = [
             <img
               src="https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?q=80&w=1470&auto=format&fit=crop"
               alt="Trading Platform"
-              class="w-full border border-gray-700 rounded-lg shadow-lg"
+              class="w-full border rounded-lg shadow-lg"
             >
           </div>
         </div>
@@ -178,7 +178,7 @@ const advantages = [
     </div>
 
     <!-- 开始使用 -->
-    <div class="from-blue-600 to-indigo-800 bg-gradient-to-r py-16 text-center text-white">
+    <div class="from-blue-600 to-indigo-800 bg-gradient-to-r py-16 text-center">
       <div class="mx-auto px-4 container">
         <h2 class="mb-6 text-3xl font-bold">
           准备好开始交易了吗？
@@ -196,14 +196,14 @@ const advantages = [
     </div>
 
     <!-- 简化的页脚 -->
-    <footer class="border-t border-gray-700 bg-gray-800 py-10 text-white">
+    <footer class="border-t  py-10 ">
       <div class="mx-auto px-4 container">
         <div class="grid grid-cols-1 gap-8 md:grid-cols-4">
           <div>
             <h3 class="mb-4 text-lg font-semibold">
               关于我们
             </h3>
-            <p class="text-gray-400">
+            <p>
               StockVision 是一个专业的股票交易平台，致力于为投资者提供安全、高效、专业的交易体验。
             </p>
           </div>
@@ -212,10 +212,8 @@ const advantages = [
               产品服务
             </h3>
             <ul class="space-y-2">
-              <li><a href="#" class="text-gray-300 hover:text-white">行情数据</a></li>
-              <li><a href="#" class="text-gray-300 hover:text-white">交易系统</a></li>
-              <li><a href="#" class="text-gray-300 hover:text-white">量化策略</a></li>
-              <li><a href="#" class="text-gray-300 hover:text-white">API接口</a></li>
+              <li><a href="#">行情数据</a></li>
+              <li><a href="#">交易系统</a></li>
             </ul>
           </div>
           <div>
@@ -223,29 +221,21 @@ const advantages = [
               帮助中心
             </h3>
             <ul class="space-y-2">
-              <li><a href="#" class="text-gray-300 hover:text-white">新手指南</a></li>
-              <li><a href="#" class="text-gray-300 hover:text-white">常见问题</a></li>
-              <li><a href="#" class="text-gray-300 hover:text-white">费用说明</a></li>
-              <li><a href="#" class="text-gray-300 hover:text-white">安全保障</a></li>
+              <li><a href="#">新手指南</a></li>
+              <li><a href="#">常见问题</a></li>
             </ul>
           </div>
           <div>
             <h3 class="mb-4 text-lg font-semibold">
               联系我们
             </h3>
-            <p class="mb-2 text-gray-300">
+            <p class="mb-2">
               客服电话：400-123-4567
             </p>
-            <p class="mb-2 text-gray-300">
+            <p class="mb-2">
               邮箱：support@stockvision.com
             </p>
           </div>
-        </div>
-        <div class="mt-8 border-t border-gray-700 pt-8 text-center text-sm text-gray-400">
-          <p>© 2023 StockVision 股票交易平台 版权所有</p>
-          <p class="mt-1">
-            ICP备案号：京ICP备12345678号-1
-          </p>
         </div>
       </div>
     </footer>
@@ -257,26 +247,5 @@ const advantages = [
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-}
-
-/* 添加过渡效果 */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.5s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
-:deep(.el-button--default.is-plain) {
-  color: #e2e8f0;
-  border-color: #e2e8f0;
-}
-
-:deep(.el-button--default.is-plain:hover) {
-  color: #3b82f6;
-  border-color: #3b82f6;
 }
 </style>
