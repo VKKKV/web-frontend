@@ -2,24 +2,28 @@
 <script setup>
 import { Check } from '@element-plus/icons-vue'
 import axios from 'axios'
+import { ElMessage } from 'element-plus'
 import { onMounted, ref } from 'vue'
+import { useAuth } from '~/composables/useAuth.js'
+
+const { userId } = useAuth()
 
 const loading = ref(false)
 const stockList = ref([])
 const tradeHistory = ref([])
 
 const form = ref({
-  symbol: '',
+  symbol: '600004',
   side: 'BUY',
-  orderType: 'LIMIT',
-  price: 0,
+  orderType: 'MARKET',
+  price: 10,
   quantity: 100,
 })
 
 // 获取可交易股票列表
 async function fetchStockList() {
   try {
-    const response = await axios.get('/api/v1/market/stocks/tradable')
+    const response = await axios.get('/api/v1/market/stocks')
     if (response.data.code === 200) {
       stockList.value = response.data.data.map(stock => ({
         value: stock.stockCode,
@@ -39,17 +43,24 @@ async function fetchTradeHistory() {
       params: {
         page: 0,
         size: 10,
+        userId: userId.value,
       },
     })
     if (response.data.code === 200) {
-      tradeHistory.value = response.data.data.content.map(trade => ({
-        time: new Date(trade.tradeTime).toLocaleString(),
-        symbol: trade.stockCode,
-        side: trade.side,
-        price: trade.price,
-        quantity: trade.quantity,
-        status: trade.status,
+      tradeHistory.value = response.data.data.records.map(record => ({
+        time: record.createdAt,
+        // 使用股票ID作为值
+        symbol: record.stockId,
+        side: record.actionType,
+        price: record.price,
+        quantity: record.quantity,
+        status: record.status,
       }))
+      const pagination = {
+        total: response.data.data.total,
+        current: response.data.data.current,
+        pageSize: response.data.data.size,
+      }
     }
   }
   catch (error) {
@@ -67,24 +78,31 @@ async function submitOrder() {
   loading.value = true
   try {
     const orderData = {
+      userId: userId.value, // 确保解包 ref
       stockCode: form.value.symbol,
-      side: form.value.side,
-      orderType: form.value.orderType,
-      price: form.value.orderType === 'LIMIT' ? form.value.price : null,
+      type: form.value.side,
       quantity: form.value.quantity,
+      price: form.value.orderType === 'LIMIT' ? form.value.price : 100, // 根据接口需求调整
+      orderType: form.value.orderType,
     }
 
-    const response = await axios.post('/api/v1/trade/orders', orderData)
+    // console.log('提交数据:', JSON.stringify(orderData)) // 调试日志
 
+    const response = await axios.post('/api/v1/trade/order', orderData)
     if (response.data.code === 200) {
       ElMessage.success('委托提交成功')
       // 刷新交易历史
-      fetchTradeHistory()
+      await fetchTradeHistory()
     }
   }
   catch (error) {
     console.error('提交委托失败:', error)
-    ElMessage.error(error.response?.data?.message || '提交委托失败')
+    // console.log('错误详情:', error.response?.data)
+    ElMessage.error(
+      error.response?.data?.message
+        ? String(error.response.data.message)
+        : '提交委托失败',
+    )
   }
   finally {
     loading.value = false
@@ -154,8 +172,8 @@ onMounted(() => {
 
         <el-form-item label="委托类型">
           <el-select v-model="form.orderType">
-            <el-option label="限价单" value="LIMIT" />
             <el-option label="市价单" value="MARKET" />
+            <el-option label="限价单" value="LIMIT" />
           </el-select>
         </el-form-item>
 
@@ -235,6 +253,7 @@ onMounted(() => {
 .trade-container {
   padding: 20px;
 }
+
 .history-card {
   margin-top: 20px;
 }

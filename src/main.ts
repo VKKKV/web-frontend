@@ -10,9 +10,9 @@ import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import ElementPlus from 'element-plus'
 // if you do not need ssg:
 import { createApp } from 'vue'
-import router from './router'
-
 import App from './App.vue'
+
+import router from './router'
 // import all element css, uncommented next line
 import 'element-plus/dist/index.css'
 import '~/styles/index.scss'

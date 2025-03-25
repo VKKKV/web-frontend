@@ -1,10 +1,10 @@
 <script setup>
-import { dispose, init } from 'klinecharts'
-import { onMounted, onUnmounted, shallowRef, ref, watch, computed } from 'vue'
-import { QuestionFilled, Search } from '@element-plus/icons-vue'
-import { useRoute } from 'vue-router'
+import { Search } from '@element-plus/icons-vue'
 import axios from 'axios'
 import { ElLoading, ElMessage } from 'element-plus'
+import { dispose, init } from 'klinecharts'
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
+import { useRoute } from 'vue-router'
 
 const route = useRoute()
 const chart = shallowRef(null)
@@ -25,28 +25,31 @@ async function fetchStockList() {
     // 显示加载动画
     const loadingInstance = ElLoading.service({
       target: '.stock-search-container',
-      text: '加载股票列表...'
+      text: '加载股票列表...',
     })
-    
+
     // 从后端API获取股票列表
     const response = await axios.get('/api/v1/stocks')
-    
+
     // 处理响应数据
     if (response.data && Array.isArray(response.data.stocks)) {
       stockOptions.value = response.data.stocks
-    } else {
+    }
+    else {
       // 如果API返回格式不符合预期，使用默认数据
       console.warn('后端返回的股票数据格式不符合预期，使用默认数据')
       stockOptions.value = getDefaultStocks()
     }
-    
+
     loadingInstance.close()
-  } catch (error) {
+  }
+  catch (error) {
     console.error('获取股票列表失败:', error)
     ElMessage.error('获取股票列表失败，使用默认数据')
     // 加载失败时使用默认数据
     stockOptions.value = getDefaultStocks()
-  } finally {
+  }
+  finally {
     isLoadingStocks.value = false
   }
 }
@@ -58,33 +61,34 @@ function getDefaultStocks() {
     { value: 'MSFT', label: '微软 (MSFT)', market: '纳斯达克', industry: '科技' },
     { value: 'GOOGL', label: '谷歌 (GOOGL)', market: '纳斯达克', industry: '科技' },
     { value: 'AMZN', label: '亚马逊 (AMZN)', market: '纳斯达克', industry: '电商' },
-    { value: 'TSLA', label: '特斯拉 (TSLA)', market: '纳斯达克', industry: '汽车' }
+    { value: 'TSLA', label: '特斯拉 (TSLA)', market: '纳斯达克', industry: '汽车' },
   ]
 }
 
 // 搜索过滤
-const filterStocks = (queryString) => {
+function filterStocks(queryString) {
   if (queryString) {
     const lowercaseQuery = queryString.toLowerCase()
     return stockOptions.value.filter(
-      stock => stock.value.toLowerCase().includes(lowercaseQuery) || 
-               stock.label.toLowerCase().includes(lowercaseQuery) ||
-               (stock.industry && stock.industry.toLowerCase().includes(lowercaseQuery)) ||
-               (stock.market && stock.market.toLowerCase().includes(lowercaseQuery))
+      stock => stock.value.toLowerCase().includes(lowercaseQuery)
+        || stock.label.toLowerCase().includes(lowercaseQuery)
+        || (stock.industry && stock.industry.toLowerCase().includes(lowercaseQuery))
+        || (stock.market && stock.market.toLowerCase().includes(lowercaseQuery)),
     )
   }
   return stockOptions.value
 }
 
 // 处理搜索结果
-const handleSelect = (item) => {
+function handleSelect(item) {
   if (typeof item === 'string') {
     // 如果直接输入了股票代码
     const stock = stockOptions.value.find(s => s.value === item.toUpperCase())
     if (stock) {
       switchStock(stock.value)
     }
-  } else {
+  }
+  else {
     // 如果选择了下拉菜单中的项目
     switchStock(item.value)
   }
@@ -92,7 +96,7 @@ const handleSelect = (item) => {
 }
 
 // 远程搜索处理
-const querySearch = (queryString, cb) => {
+function querySearch(queryString, cb) {
   const results = filterStocks(queryString)
   cb(results)
 }
@@ -120,8 +124,8 @@ function createWebSocketConnection() {
       ws.value.close()
     }
     // 创建新连接
-    ws.value = new WebSocket('ws://' + window.location.host + '/ws/v1/market/subscribe')
-    
+    ws.value = new WebSocket(`ws://${window.location.host}/ws/v1/market/subscribe`)
+
     // 二进制传输格式
     ws.value.binaryType = 'arraybuffer'
 
@@ -129,7 +133,7 @@ function createWebSocketConnection() {
       console.log('WebSocket连接已建立')
       isConnected.value = true
       reconnectAttempts = 0 // 重置重连计数
-      
+
       // 增加心跳检测机制
       setInterval(() => {
         if (ws.value && ws.value.readyState === WebSocket.OPEN) {
@@ -139,7 +143,7 @@ function createWebSocketConnection() {
 
       // 设置数据模式
       setDataMode(useTestData.value)
-      
+
       // 订阅股票数据
       subscribeToStock(selectedSymbol.value)
     }
@@ -147,26 +151,15 @@ function createWebSocketConnection() {
     ws.value.onmessage = ({ data }) => {
       try {
         let payload
-        
+
         // 处理不同类型的数据
         if (data instanceof ArrayBuffer) {
           const decoder = new TextDecoder()
           const jsonStr = decoder.decode(data)
           payload = JSON.parse(jsonStr)
-        } else {
+        }
+        else {
           payload = JSON.parse(data)
-        }
-
-        // 处理心跳响应
-        if (payload.type === 'pong') {
-          console.log('收到心跳响应')
-          return
-        }
-        
-        // 处理数据模式设置确认
-        if (payload.action === 'dataModeSet') {
-          console.log('数据模式已设置为:', payload.useTestData ? '测试数据' : '真实数据')
-          return
         }
 
         // 只处理当前选中的股票
@@ -183,32 +176,31 @@ function createWebSocketConnection() {
           low: +targetData.low.toFixed(2),
           volume: targetData.volume,
         })
-        
+
         // 更新实时数据表格
         realtimeData.value.unshift({
           time: new Date(targetData.timestamp).toLocaleTimeString(),
           price: targetData.close.toFixed(2),
-          volume: targetData.volume
+          volume: targetData.volume,
         })
-        
+
         // 限制表格数据量
         if (realtimeData.value.length > 10) {
           realtimeData.value = realtimeData.value.slice(0, 10)
         }
-      } catch (error) {
+      }
+      catch (error) {
         console.error('处理WebSocket消息时出错:', error)
       }
     }
 
     ws.value.onclose = (event) => {
-      console.log('WebSocket连接已关闭:', event.code, event.reason)
       isConnected.value = false
-      
+
       // 尝试重连
       if (reconnectAttempts < 5) {
-        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000)
-        console.log(`将在 ${delay}ms 后尝试重连...`)
-        
+        const delay = Math.min(1000 * 2 ** reconnectAttempts, 30000)
+
         reconnectTimer = setTimeout(() => {
           reconnectAttempts++
           createWebSocketConnection()
@@ -219,7 +211,8 @@ function createWebSocketConnection() {
     ws.value.onerror = (error) => {
       console.error('WebSocket错误:', error)
     }
-  } catch (error) {
+  }
+  catch (error) {
     console.error('创建WebSocket连接时出错:', error)
   }
 }
@@ -229,10 +222,9 @@ function setDataMode(useTestData) {
   if (ws.value && ws.value.readyState === WebSocket.OPEN) {
     const message = {
       action: 'setDataMode',
-      useTestData: useTestData
+      useTestData,
     }
     ws.value.send(JSON.stringify(message))
-    console.log(`数据模式设置: ${useTestData ? '使用测试数据' : '使用模拟真实数据'}`)
   }
 }
 
@@ -241,7 +233,6 @@ function toggleDataMode() {
   useTestData.value = !useTestData.value
   const newMode = useTestData.value
   setDataMode(newMode)
-  console.log(`切换数据模式: ${newMode ? '开启测试数据' : '关闭测试数据'}`)
 }
 
 // 订阅股票数据
@@ -249,27 +240,27 @@ function subscribeToStock(symbol) {
   if (ws.value && ws.value.readyState === WebSocket.OPEN) {
     const subscription = {
       action: 'subscribe',
-      stock_codes: [symbol]
+      stock_codes: [symbol],
     }
     ws.value.send(JSON.stringify(subscription))
-    console.log(`已订阅股票: ${symbol}`)
   }
 }
 
 // 切换股票时的处理
 function switchStock(symbol) {
-  if (symbol === selectedSymbol.value) return
-  
+  if (symbol === selectedSymbol.value)
+    return
+
   selectedSymbol.value = symbol
   // 清空当前数据
   realtimeData.value = []
-  
+
   // 重新初始化图表
   dispose('chart-container')
   setTimeout(() => {
     initChart()
   }, 100)
-  
+
   if (ws.value && ws.value.readyState === WebSocket.OPEN) {
     // 取消订阅当前股票
     const msg = {
@@ -284,8 +275,9 @@ function switchStock(symbol) {
 }
 
 function updateChartData(kLine) {
-  if (!chart.value) return
-  
+  if (!chart.value)
+    return
+
   // 添加时区转换逻辑（根据需要）
   const adjustedTimestamp = kLine.timestamp /* + 时区偏移量 */
 
@@ -304,10 +296,10 @@ function initChart() {
     console.error('找不到图表容器')
     return
   }
-  
+
   // 初始化图表
   chart.value = init('chart-container')
-  
+
   // 设置图表样式
   chart.value.setStyles({
     grid: {
@@ -323,28 +315,28 @@ function initChart() {
         size: 1,
         color: '#EDEDED',
         style: 'solid',
-      }
+      },
     },
     candle: {
       type: 'candle_solid',
       bar: {
         upColor: '#26A69A',
         downColor: '#EF5350',
-        noChangeColor: '#888888'
+        noChangeColor: '#888888',
       },
       area: {
         lineSize: 2,
         lineColor: '#2196F3',
         value: 'close',
-        backgroundColor: 'rgba(33, 150, 243, 0.1)'
-      }
-    }
+        backgroundColor: 'rgba(33, 150, 243, 0.1)',
+      },
+    },
   })
-  
+
   // 创建一些初始数据，以便图表能够显示
   const timestamp = Date.now()
   const basePrice = getBasePrice(selectedSymbol.value)
-  
+
   const initialData = []
   for (let i = 0; i < 20; i++) {
     const time = timestamp - (20 - i) * 60 * 1000
@@ -352,7 +344,7 @@ function initChart() {
     const close = basePrice + Math.random() * 5 - 2.5
     const high = Math.max(open, close) + Math.random() * 2
     const low = Math.min(open, close) - Math.random() * 2
-    
+
     initialData.push({
       timestamp: time,
       open,
@@ -360,65 +352,64 @@ function initChart() {
       low,
       close,
       volume: 10000 + Math.random() * 5000,
-      turnover: (10000 + Math.random() * 5000) * close
+      turnover: (10000 + Math.random() * 5000) * close,
     })
   }
-  
+
   // 设置初始数据
   chart.value.applyNewData(initialData)
-  
+
   // 添加技术指标
   if (indicator.value) {
     addIndicator(indicator.value)
   }
-  
-  console.log('图表初始化完成')
 }
 
 // 根据股票代码获取基础价格
 function getBasePrice(symbol) {
   const priceMap = {
-    'AAPL': 185,
-    'MSFT': 420,
-    'GOOGL': 170,
-    'AMZN': 180,
-    'TSLA': 250,
-    'META': 500,
-    'NVDA': 120,
-    'NFLX': 630,
-    'PYPL': 65,
-    'INTC': 35,
-    'AMD': 160,
-    'BABA': 85,
-    'BIDU': 105,
-    'JD': 28,
-    'PDD': 140,
-    'NIO': 5,
-    'XPEV': 8,
-    'LI': 35,
-    'JPM': 195,
-    'V': 275,
-    'MA': 450,
-    'DIS': 90,
-    'KO': 60,
-    'PEP': 170
+    AAPL: 185,
+    MSFT: 420,
+    GOOGL: 170,
+    AMZN: 180,
+    TSLA: 250,
+    META: 500,
+    NVDA: 120,
+    NFLX: 630,
+    PYPL: 65,
+    INTC: 35,
+    AMD: 160,
+    BABA: 85,
+    BIDU: 105,
+    JD: 28,
+    PDD: 140,
+    NIO: 5,
+    XPEV: 8,
+    LI: 35,
+    JPM: 195,
+    V: 275,
+    MA: 450,
+    DIS: 90,
+    KO: 60,
+    PEP: 170,
   }
-  
+
   return priceMap[symbol] || 100 // 默认价格为100
 }
 
 // 添加技术指标
 function addIndicator(type) {
-  if (!chart.value) return
-  
+  if (!chart.value)
+    return
+
   // 移除现有指标
   const panes = chart.value.getPanes()
-  panes.forEach(pane => {
+  panes.forEach((pane) => {
     if (pane.id !== 'candle_pane') {
       chart.value.removePane(pane.id)
     }
   })
-  
+
   // 添加新指标
   switch (type) {
     case 'macd':
@@ -446,28 +437,28 @@ watch(indicator, (newValue) => {
 onMounted(async () => {
   // 获取股票列表
   await fetchStockList()
-  
+
   // 检查URL参数
   const codeParam = route.query.code
   if (codeParam && typeof codeParam === 'string') {
     selectedSymbol.value = codeParam
   }
-  
+
   // 初始化图表
   initChart()
-  
+
   // 创建WebSocket连接
   createWebSocketConnection()
 })
 
 onUnmounted(() => {
   dispose('chart-container')
-  
+
   // 清除重连定时器
   if (reconnectTimer) {
     clearTimeout(reconnectTimer)
   }
-  
+
   // 关闭WebSocket连接
   if (ws.value) {
     // 发送取消订阅请求
@@ -486,44 +477,50 @@ onUnmounted(() => {
 <template>
   <div class="min-h-screen flex flex-col">
     <!-- 连接状态指示器 -->
-    <div class="container mx-auto px-4 py-2 flex justify-end items-center">
-      <span class="text-gray-600 mr-2">WebSocket状态:</span>
+    <div class="mx-auto flex items-center justify-end px-4 py-2 container">
+      <span class="mr-2 text-gray-600">WebSocket状态:</span>
       <el-tag :type="isConnected ? 'success' : 'danger'" size="small">
         {{ isConnected ? '已连接' : '未连接' }}
       </el-tag>
     </div>
 
-    <div class="p-4 flex-grow">
+    <div class="flex-grow p-4">
       <!-- 搜索股票 -->
-      <div class="mb-4 stock-search-container">
+      <div class="stock-search-container mb-4">
         <el-card v-loading="isLoadingStocks">
           <div class="flex flex-col md:flex-row md:items-center">
             <div class="flex-1">
-              <div class="text-xl font-bold mb-2">{{ currentStockName }}</div>
-              <div class="text-gray-500">{{ currentStockInfo }}</div>
+              <div class="mb-2 text-xl font-bold">
+                {{ currentStockName }}
+              </div>
+              <div class="text-gray-500">
+                {{ currentStockInfo }}
+              </div>
             </div>
-            <div class="mt-3 md:mt-0 md:ml-4 flex items-center">
+            <div class="mt-3 flex items-center md:ml-4 md:mt-0">
               <span class="mr-2 font-medium">搜索股票:</span>
               <el-autocomplete
                 v-model="searchInput"
                 :fetch-suggestions="querySearch"
                 placeholder="输入股票代码、名称、行业或市场"
-                @select="handleSelect"
                 style="width: 300px"
                 :trigger-on-focus="true"
                 clearable
                 :disabled="isLoadingStocks"
+                @select="handleSelect"
               >
                 <template #prefix>
                   <el-icon><Search /></el-icon>
                 </template>
                 <template #default="{ item }">
                   <div class="flex flex-col">
-                    <div class="flex justify-between items-center">
+                    <div class="flex items-center justify-between">
                       <span class="font-medium">{{ item.label }}</span>
-                      <el-tag size="small" type="info">{{ item.value }}</el-tag>
+                      <el-tag size="small" type="info">
+                        {{ item.value }}
+                      </el-tag>
                     </div>
-                    <div v-if="item.market" class="text-xs text-gray-500 mt-1">
+                    <div v-if="item.market" class="mt-1 text-xs text-gray-500">
                       {{ item.market }} | {{ item.industry }}
                     </div>
                   </div>
@@ -533,12 +530,12 @@ onUnmounted(() => {
           </div>
         </el-card>
       </div>
-      
+
       <!-- K线图容器 -->
       <div class="chart-wrapper mb-4">
-        <div id="chart-container"></div>
+        <div id="chart-container" />
       </div>
-      
+
       <el-row :gutter="20" class="mt-4">
         <el-col :span="8">
           <el-card>
@@ -548,9 +545,9 @@ onUnmounted(() => {
               </div>
             </template>
             <el-select v-model="indicator" placeholder="选择技术指标">
-              <el-option label="MACD" value="macd"/>
-              <el-option label="RSI" value="rsi"/>
-              <el-option label="布林带" value="boll"/>
+              <el-option label="MACD" value="macd" />
+              <el-option label="RSI" value="rsi" />
+              <el-option label="布林带" value="boll" />
             </el-select>
           </el-card>
         </el-col>
@@ -563,9 +560,9 @@ onUnmounted(() => {
               </div>
             </template>
             <el-table :data="realtimeData" height="200">
-              <el-table-column prop="time" label="时间"/>
-              <el-table-column prop="price" label="价格"/>
-              <el-table-column prop="volume" label="成交量"/>
+              <el-table-column prop="time" label="时间" />
+              <el-table-column prop="price" label="价格" />
+              <el-table-column prop="volume" label="成交量" />
             </el-table>
           </el-card>
         </el-col>
@@ -605,4 +602,4 @@ onUnmounted(() => {
   position: relative;
   min-height: 100px;
 }
-</style> 
+</style>

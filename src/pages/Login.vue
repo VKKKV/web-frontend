@@ -54,12 +54,10 @@ async function handleLogin() {
 
         // 跳转到上次访问的页面或首页
         // redirectAfterLogin()
-
+        redirectAfterLogin()
         setTimeout(() => {
-          redirectAfterLogin()
-
           window.location.reload()
-        }, 1000)
+        }, 500)
       }
       catch (error) {
         console.error('登录出错:', error)
