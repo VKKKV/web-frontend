@@ -1,5 +1,5 @@
 <script setup>
-import { Search } from '@element-plus/icons-vue'
+
 import axios from 'axios'
 import { ElLoading, ElMessage } from 'element-plus'
 import { dispose, init } from 'klinecharts'
@@ -29,7 +29,7 @@ async function fetchStockList() {
     })
 
     // 从后端API获取股票列表
-    const response = await axios.get('/api/v1/stocks')
+    const response = await axios.get('/api/v1/market/stocks')
 
     // 处理响应数据
     if (response.data && Array.isArray(response.data.stocks)) {
@@ -130,7 +130,7 @@ function createWebSocketConnection() {
     ws.value.binaryType = 'arraybuffer'
 
     ws.value.onopen = () => {
-      console.log('WebSocket连接已建立')
+      ElMessage.info('WebSocket连接已建立')
       isConnected.value = true
       reconnectAttempts = 0 // 重置重连计数
 
@@ -190,7 +190,7 @@ function createWebSocketConnection() {
         }
       }
       catch (error) {
-        console.error('处理WebSocket消息时出错:', error)
+        ElMessage.error('处理WebSocket消息时出错:', error)
       }
     }
 
@@ -226,13 +226,6 @@ function setDataMode(useTestData) {
     }
     ws.value.send(JSON.stringify(message))
   }
-}
-
-// 切换数据模式
-function toggleDataMode() {
-  useTestData.value = !useTestData.value
-  const newMode = useTestData.value
-  setDataMode(newMode)
 }
 
 // 订阅股票数据
@@ -537,22 +530,22 @@ onUnmounted(() => {
       </div>
 
       <el-row :gutter="20" class="mt-4">
-        <el-col :span="8">
-          <el-card>
-            <template #header>
-              <div class="font-bold">
-                指标选择
-              </div>
-            </template>
-            <el-select v-model="indicator" placeholder="选择技术指标">
-              <el-option label="MACD" value="macd" />
-              <el-option label="RSI" value="rsi" />
-              <el-option label="布林带" value="boll" />
-            </el-select>
-          </el-card>
-        </el-col>
+<!--        <el-col :span="8">-->
+<!--          <el-card>-->
+<!--            <template #header>-->
+<!--              <div class="font-bold">-->
+<!--                指标选择-->
+<!--              </div>-->
+<!--            </template>-->
+<!--            <el-select v-model="indicator" placeholder="选择技术指标">-->
+<!--              <el-option label="MACD" value="macd" />-->
+<!--              <el-option label="RSI" value="rsi" />-->
+<!--              <el-option label="布林带" value="boll" />-->
+<!--            </el-select>-->
+<!--          </el-card>-->
+<!--        </el-col>-->
 
-        <el-col :span="16">
+        <el-col :span="24">
           <el-card>
             <template #header>
               <div class="font-bold">

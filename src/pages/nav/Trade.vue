@@ -1,153 +1,162 @@
-<!-- src/views/Trade.vue -->
 <script setup>
 import { Check } from '@element-plus/icons-vue'
-import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import { onMounted, ref } from 'vue'
-import { useAuth } from '~/composables/useAuth.js'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useAuth } from '~/composables/useAuth'
+import { useTrade } from '~/composables/useTrade'
+import request from '~/utils/request'
 
 const { userId } = useAuth()
+const { loading: submitting, submitOrder } = useTrade()
 
-const loading = ref(false)
+// 响应式数据
 const stockList = ref([])
 const tradeHistory = ref([])
+const currentMarketPrice = ref(100.00)
+const priceInterval = ref(null)
 
 const form = ref({
   symbol: '600004',
   side: 'BUY',
   orderType: 'MARKET',
-  price: 10,
+  price: null,
   quantity: 100,
 })
 
-// 获取可交易股票列表
-async function fetchStockList() {
+// 计算属性
+const isMarketOrder = computed(() => form.value.orderType === 'MARKET')
+const priceRules = computed(() => [
+  {
+    required: !isMarketOrder.value,
+    message: '限价委托必须输入价格',
+    trigger: 'blur',
+  },
+  {
+    validator: (_, value) => value > 0,
+    message: '价格必须大于0',
+    trigger: ['blur', 'change'],
+  },
+])
+
+// 数据获取
+async function fetchInitialData() {
   try {
-    const response = await axios.get('/api/v1/market/stocks')
-    if (response.data.code === 200) {
-      stockList.value = response.data.data.map(stock => ({
-        value: stock.stockCode,
-        label: `${stock.stockName} (${stock.stockCode})`,
-      }))
-    }
+    // const [stocks, history] = await Promise.all([
+    // request.get('/market/stocks'),
+    //   request.get('/trade/history', {
+    //     params: {
+    //       page: 0,
+    //       size: 10,
+    //       userId: userId.value,
+    //     },
+    //   }),
+    // ])
+    //
+    // stockList.value = stocks.map(s => ({
+    //   value: s.stockCode,
+    //   label: `${s.stockName} (${s.stockCode})`,
+    // }))
+    const history = await Promise.all([
+      request.get('/trade/history', {
+        params: {
+          page: 0,
+          size: 10,
+          userId: userId.value,
+        },
+      }),
+    ])
+
+    tradeHistory.value = history.records.map(record => ({
+      ...record,
+      price: Number(record.price),
+      time: record.createdAt,
+    }))
   }
   catch (error) {
-    console.error('获取股票列表失败:', error)
+    ElMessage.error('初始化数据加载失败')
   }
 }
 
-// 获取交易历史
-async function fetchTradeHistory() {
-  try {
-    const response = await axios.get('/api/v1/trade/history', {
-      params: {
-        page: 0,
-        size: 10,
-        userId: userId.value,
-      },
-    })
-    if (response.data.code === 200) {
-      tradeHistory.value = response.data.data.records.map(record => ({
-        time: record.createdAt,
-        // 使用股票ID作为值
-        symbol: record.stockId,
-        side: record.actionType,
-        price: record.price,
-        quantity: record.quantity,
-        status: record.status,
-      }))
-      const pagination = {
-        total: response.data.data.total,
-        current: response.data.data.current,
-        pageSize: response.data.data.size,
-      }
-    }
-  }
-  catch (error) {
-    console.error('获取交易历史失败:', error)
+// 价格处理
+function generateMarketPrice() {
+  const fluctuation = currentMarketPrice.value * 0.02
+  return Number(
+    (currentMarketPrice.value + (Math.random() * fluctuation * 2 - fluctuation))
+      .toFixed(2),
+  )
+}
+
+function updateMarketPrice() {
+  if (isMarketOrder.value) {
+    form.value.price = generateMarketPrice()
   }
 }
 
-// 提交订单
-async function submitOrder() {
-  if (!form.value.symbol) {
-    ElMessage.warning('请选择交易股票')
-    return
-  }
-
-  loading.value = true
-  try {
-    const orderData = {
-      userId: userId.value, // 确保解包 ref
-      stockCode: form.value.symbol,
-      type: form.value.side,
-      quantity: form.value.quantity,
-      price: form.value.orderType === 'LIMIT' ? form.value.price : 100, // 根据接口需求调整
-      orderType: form.value.orderType,
-    }
-
-    // console.log('提交数据:', JSON.stringify(orderData)) // 调试日志
-
-    const response = await axios.post('/api/v1/trade/order', orderData)
-    if (response.data.code === 200) {
-      ElMessage.success('委托提交成功')
-      // 刷新交易历史
-      await fetchTradeHistory()
-    }
-  }
-  catch (error) {
-    console.error('提交委托失败:', error)
-    // console.log('错误详情:', error.response?.data)
-    ElMessage.error(
-      error.response?.data?.message
-        ? String(error.response.data.message)
-        : '提交委托失败',
-    )
-  }
-  finally {
-    loading.value = false
-  }
-}
-
-// 获取股票实时价格
+// 事件处理
 async function handleSymbolChange(symbol) {
   if (!symbol)
     return
 
   try {
-    const response = await axios.get(`/api/v1/market/stocks/${symbol}/price`)
-    if (response.data.code === 200) {
-      form.value.price = response.data.data.price
-    }
+    const { price } = await request.get(`/market/stocks/${symbol}/price`)
+    currentMarketPrice.value = price
+    updateMarketPrice()
   }
-  catch (error) {
-    console.error('获取股票价格失败:', error)
+  catch {
+    ElMessage.error('获取实时价格失败')
   }
 }
 
-// 初始化加载
+async function handleSubmit() {
+  if (!form.value.symbol) {
+    return ElMessage.warning('请选择交易股票')
+  }
+
+  try {
+    await submitOrder({
+      userId: userId.value,
+      stockCode: form.value.symbol,
+      type: form.value.side,
+      quantity: form.value.quantity,
+      price: isMarketOrder.value ? currentMarketPrice.value : form.value.price,
+      orderType: form.value.orderType,
+    })
+
+    ElMessage.success('委托提交成功')
+    await fetchInitialData()
+  }
+  catch (error) {
+    ElMessage.error(error.message || '提交委托失败')
+  }
+}
+
+// 生命周期
 onMounted(() => {
-  fetchStockList()
-  fetchTradeHistory()
+  fetchInitialData()
+  priceInterval.value = setInterval(updateMarketPrice, 5000)
+})
+
+onBeforeUnmount(() => {
+  clearInterval(priceInterval.value)
 })
 </script>
 
 <template>
-  <div class="trade-container">
-    <el-card class="mx-auto max-w-2xl">
+  <div class="mx-auto max-w-2xl p-4 space-y-4">
+    <el-card>
       <template #header>
-        <div class="text-xl font-bold">
+        <h2 class="text-xl font-bold">
           股票交易
-        </div>
+        </h2>
       </template>
 
-      <el-form :model="form" label-width="100px">
-        <el-form-item label="股票代码">
+      <el-form :model="form" label-width="100px" @submit.prevent="handleSubmit">
+        <!-- 优化后的表单结构 -->
+        <el-form-item label="股票代码" prop="symbol" required>
           <el-select
             v-model="form.symbol"
             filterable
             placeholder="输入股票代码"
-            :loading="!stockList.length"
             @change="handleSymbolChange"
           >
             <el-option
@@ -159,32 +168,31 @@ onMounted(() => {
           </el-select>
         </el-form-item>
 
-        <el-form-item label="买卖方向">
-          <el-radio-group v-model="form.side">
-            <el-radio-button label="BUY">
-              买入
-            </el-radio-button>
-            <el-radio-button label="SELL">
-              卖出
-            </el-radio-button>
-          </el-radio-group>
-        </el-form-item>
-
         <el-form-item label="委托类型">
-          <el-select v-model="form.orderType">
-            <el-option label="市价单" value="MARKET" />
-            <el-option label="限价单" value="LIMIT" />
+          <el-select
+            v-model="form.orderType"
+            class="w-full"
+            @change="updateMarketPrice"
+          >
+            <el-option label="市价委托" value="MARKET" />
+            <el-option label="限价委托" value="LIMIT" />
           </el-select>
         </el-form-item>
 
-        <el-form-item v-if="form.orderType === 'LIMIT'" label="价格">
+        <el-form-item :label="`${isMarketOrder ? '市价' : '限价'}委托`" prop="price" :rules="priceRules">
           <el-input-number
             v-model="form.price"
             :precision="2"
             :min="0.01"
-            :step="0.01"
-            :controls="false"
-          />
+            :disabled="isMarketOrder"
+            class="w-full"
+          >
+            <template v-if="isMarketOrder" #append>
+              <el-icon title="刷新价格" @click="updateMarketPrice">
+                <Refresh />
+              </el-icon>
+            </template>
+          </el-input-number>
         </el-form-item>
 
         <el-form-item label="数量">
@@ -199,9 +207,9 @@ onMounted(() => {
         <el-form-item>
           <el-button
             type="primary"
-            :loading="loading"
+            native-type="submit"
+            :loading="submitting"
             :icon="Check"
-            @click="submitOrder"
           >
             提交委托
           </el-button>
@@ -248,13 +256,3 @@ onMounted(() => {
     </el-card>
   </div>
 </template>
-
-<style scoped>
-.trade-container {
-  padding: 20px;
-}
-
-.history-card {
-  margin-top: 20px;
-}
-</style>
