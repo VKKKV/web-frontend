@@ -42,12 +42,12 @@ async function fetchStocks() {
     </el-input>
 
     <el-table v-loading="loading" :data="stockList" style="margin-top:20px">
-      <el-table-column prop="stock_code" label="代码" width="120" />
+<!--      <el-table-column prop="stock_code" label="代码" width="120" />-->
       <el-table-column prop="name" label="名称" />
-      <el-table-column prop="price" label="当前价" align="right" />
-      <el-table-column prop="lastPrice" label="昨收价" align="right" />
-      <el-table-column prop="high" label="最高价" align="right" />
-      <el-table-column prop="low" label="最低价" align="right" />
+      <el-table-column prop="price" label="当前价格" align="right" />
+      <el-table-column prop="lastPrice" label="昨日收盘价格" align="right" />
+      <el-table-column prop="high" label="当天最高价" align="right" />
+      <el-table-column prop="low" label="当天最低价" align="right" />
       <el-table-column label="更新时间">
         <template #default="{ row }">
           {{ formatTime(row.time) }}
