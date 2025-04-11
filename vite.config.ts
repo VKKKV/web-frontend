@@ -8,7 +8,6 @@ import VueRouter from 'unplugin-vue-router/vite'
 
 import { defineConfig } from 'vite'
 
-// https://vitejs.dev/config/
 export default defineConfig({
   resolve: {
     alias: {
@@ -63,8 +62,24 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
-        rewrite: (path) => path
-      }
+        rewrite: path => path,
+      },
+      '/stock-api': {
+        target: 'https://你的股票接口域名',
+        changeOrigin: true,
+        rewrite: path => path.replace(/^\/stock-api/, ''),
+        headers: {
+          // 部分接口需要伪造浏览器头
+          'User-Agent': 'Mozilla/5.0',
+        },
+        configure: (proxy) => {
+          proxy.on('proxyRes', (proxyRes) => {
+            // 强制添加CORS头（紧急方案）
+            proxyRes.headers['access-control-allow-origin'] = '*'
+            proxyRes.headers['access-control-allow-methods'] = 'GET'
+          })
+        },
+      },
     },
   },
 

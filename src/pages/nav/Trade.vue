@@ -1,11 +1,11 @@
 <script setup>
-import { Check } from '@element-plus/icons-vue'
+import {Check} from '@element-plus/icons-vue'
 import axios from 'axios'
-import { ElMessage } from 'element-plus'
-import { onMounted, ref } from 'vue'
-import { useAuth } from '~/composables/useAuth.js'
+import {ElMessage} from 'element-plus'
+import {computed, onMounted, ref} from 'vue'
+import {useAuth} from '~/composables/useAuth.js'
 
-const { userId } = useAuth()
+const {userId} = useAuth()
 
 const loading = ref(false)
 const stockList = ref([])
@@ -19,6 +19,10 @@ const form = ref({
   quantity: 100,
 })
 
+let cost = computed(() => {
+  return (form.value.price || 0) * (form.value.quantity || 0)
+})
+
 // 获取可交易股票列表
 async function fetchStockList() {
   try {
@@ -29,8 +33,7 @@ async function fetchStockList() {
         label: `${stock.stockName} (${stock.stockCode})`,
       }))
     }
-  }
-  catch (error) {
+  } catch (error) {
     console.error('获取股票列表失败:', error)
   }
 }
@@ -61,8 +64,7 @@ async function fetchTradeHistory() {
         pageSize: response.data.data.size,
       }
     }
-  }
-  catch (error) {
+  } catch (error) {
     console.error('获取交易历史失败:', error)
   }
 }
@@ -93,17 +95,15 @@ async function submitOrder() {
       // 刷新交易历史
       await fetchTradeHistory()
     }
-  }
-  catch (error) {
+  } catch (error) {
     console.error('提交委托失败:', error)
     // console.log('错误详情:', error.response?.data)
     ElMessage.error(
-      error.response?.data?.message
-        ? String(error.response.data.message)
-        : '提交委托失败',
+        error.response?.data?.message
+            ? String(error.response.data.message)
+            : '提交委托失败',
     )
-  }
-  finally {
+  } finally {
     loading.value = false
   }
 }
@@ -118,10 +118,14 @@ async function handleSymbolChange(symbol) {
     if (response.data.code === 200) {
       form.value.price = response.data.data.price
     }
-  }
-  catch (error) {
+  } catch (error) {
     console.error('获取股票价格失败:', error)
   }
+}
+
+const refreshMarketPrice = () => {
+  // 刷新价格
+  console.log('刷新市场价格');
 }
 
 // 初始化加载
@@ -143,17 +147,17 @@ onMounted(() => {
       <el-form :model="form" label-width="100px">
         <el-form-item label="股票代码">
           <el-select
-            v-model="form.symbol"
-            filterable
-            placeholder="输入股票代码"
-            :loading="!stockList.length"
-            @change="handleSymbolChange"
+              v-model="form.symbol"
+              filterable
+              placeholder="输入股票代码"
+              :loading="!stockList.length"
+              @change="handleSymbolChange"
           >
             <el-option
-              v-for="item in stockList"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value"
+                v-for="item in stockList"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
             />
           </el-select>
         </el-form-item>
@@ -171,38 +175,14 @@ onMounted(() => {
 
         <el-form-item label="委托类型">
           <el-select
-            v-model="form.orderType"
-            placeholder="请选择委托类型"
-            title="市价委托立即成交，限价委托需指定价格"
-            @change="handleOrderTypeChange"
+              v-model="form.orderType"
+              placeholder="请选择委托类型"
+              title="市价委托立即成交，限价委托需指定价格"
+              @change="handleOrderTypeChange"
           >
-            >
-            <el-option label="市价委托" value="MARKET" />
-            <el-option label="限价委托" value="LIMIT" />
+            <el-option label="市价委托" value="MARKET"/>
+            <el-option label="限价委托" value="LIMIT"/>
           </el-select>
-
-          <!-- 价格输入区域 -->
-          <el-form-item
-            label="委托价格"
-            :rules="priceRules"
-            prop="price"
-          >
-            <el-input
-              v-model="form.price"
-              :disabled="form.orderType === 'MARKET'"
-              :readonly="form.orderType === 'MARKET'"
-              placeholder="自动生成市场价"
-            >
-              <template v-if="form.orderType === 'MARKET'" #append>
-                <el-tooltip content="点击刷新价格">
-                  <el-icon @click="refreshMarketPrice">
-                    <Refresh />
-                  </el-icon>
-                </el-tooltip>
-              </template>
-            </el-input>
-          </el-form-item>
-
           <div class="mt-1 text-xs text-gray-500">
             * 市价委托：按当前市场最优价立即成交
             <br>
@@ -210,47 +190,58 @@ onMounted(() => {
           </div>
         </el-form-item>
 
-        <!--        <el-form-item label="委托类型"> -->
-        <!--          <el-select -->
-        <!--            v-model="form.orderType" -->
-        <!--            placeholder="请选择委托类型" -->
-        <!--            title="市价委托立即成交，限价委托需指定价格" -->
-        <!--          > -->
-        <!--            <el-option label="市价委托" value="MARKET" /> -->
-        <!--            <el-option label="限价委托" value="LIMIT" /> -->
-        <!--          </el-select> -->
-        <!--          <div class="text-xs text-gray-500 mt-1"> -->
-        <!--            * 市价委托：按当前市场最优价立即成交 -->
-        <!--            <br> -->
-        <!--            * 限价委托：设置期望成交价格等待匹配 -->
-        <!--          </div> -->
-        <!--        </el-form-item> -->
+        <el-form-item
+            label="委托价格"
+            :rules="priceRules"
+            prop="price"
+        >
+          <el-input
+              v-model="form.price"
+              :disabled="form.orderType === 'MARKET'"
+              :readonly="form.orderType === 'MARKET'"
+              placeholder="自动生成市场价"
+          >
+            <template v-if="form.orderType === 'MARKET'" #append>
+              <el-tooltip content="点击刷新价格">
+                <el-icon @click="refreshMarketPrice">
+
+                  <!-- icon -->
+                  <Refresh/>
+                </el-icon>
+              </el-tooltip>
+            </template>
+          </el-input>
+        </el-form-item>
 
         <el-form-item v-if="form.orderType === 'LIMIT'" label="价格">
           <el-input-number
-            v-model="form.price"
-            :precision="2"
-            :min="0.01"
-            :step="0.01"
-            :controls="false"
+              v-model="form.price"
+              :precision="2"
+              :min="0.01"
+              :step="0.01"
+              :controls="false"
           />
         </el-form-item>
 
         <el-form-item label="数量">
           <el-input-number
-            v-model="form.quantity"
-            :min="100"
-            :step="100"
-            :controls="false"
+              v-model="form.quantity"
+              :min="100"
+              :step="100"
+              :controls="false"
           />
+        </el-form-item>
+
+        <el-form-item label="成本">
+          <span>{{ cost }}</span>
         </el-form-item>
 
         <el-form-item>
           <el-button
-            type="primary"
-            :loading="loading"
-            :icon="Check"
-            @click="submitOrder"
+              type="primary"
+              :loading="loading"
+              :icon="Check"
+              @click="submitOrder"
           >
             提交委托
           </el-button>
@@ -266,58 +257,51 @@ onMounted(() => {
         </div>
       </template>
       <el-table
-        v-loading="loading"
-        :data="tradeHistory"
-        height="300"
-        stripe
-        style="width: 100%"
+          v-loading="loading"
+          :data="tradeHistory"
+          height="300"
+          stripe
+          style="width: 100%"
       >
         <el-table-column
-          prop="time"
-          label="时间"
-          sortable
-          min-width="180"
+            prop="time"
+            label="时间"
+            sortable
+            min-width="180"
         />
         <el-table-column
-          prop="symbol"
-          label="代码"
-          min-width="120"
+            prop="symbol"
+            label="代码"
+            min-width="120"
         />
         <el-table-column
-          label="方向"
-          min-width="120"
+            label="方向"
+            min-width="120"
         >
           <template #default="{ row }">
             <el-tag
-              :type="row.side === 'BUY' ? 'success' : 'danger'"
-              class="justify-center"
+                :type="row.side === 'BUY' ? 'success' : 'danger'"
+                class="justify-center"
             >
               {{ row.side === 'BUY' ? '买入' : '卖出' }}
             </el-tag>
           </template>
         </el-table-column>
         <el-table-column
-          prop="price"
-          label="价格"
-          min-width="140"
+            prop="price"
+            label="价格"
+            min-width="140"
         >
           <template #default="{ row }">
             {{ row.price.toFixed(2) }}
           </template>
         </el-table-column>
         <el-table-column
-          prop="quantity"
-          label="数量"
-          min-width="140"
+            prop="quantity"
+            label="数量"
+            min-width="140"
         />
       </el-table>
-      <!--        <el-table-column prop="status" label="状态" width="120"> -->
-      <!--          <template #default="{ row }"> -->
-      <!--            <el-tag :type="row.status === '成交' ? '' : 'warning'"> -->
-      <!--              {{ row.status }} -->
-      <!--            </el-tag> -->
-      <!--          </template> -->
-      <!--        </el-table-column> -->
     </el-card>
   </div>
 </template>
