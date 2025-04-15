@@ -1,5 +1,5 @@
 <script setup>
-import { Check } from '@element-plus/icons-vue'
+import { Check, Refresh } from '@element-plus/icons-vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, ref } from 'vue'
@@ -21,6 +21,34 @@ const form = ref({
 
 const cost = computed(() => {
   return (form.value.price || 0) * (form.value.quantity || 0)
+})
+
+// 添加持仓数据
+const userHoldings = ref([
+  // 临时数据示例
+  {
+    symbol: '600004',
+    name: '白云机场',
+    quantity: 1000,
+    avgPrice: 12.5,
+    currentPrice: 13.2,
+  },
+  {
+    symbol: '600519',
+    name: '贵州茅台',
+    quantity: 200,
+    avgPrice: 1800,
+    currentPrice: 1850.5,
+  },
+])
+
+// 计算持仓市值
+const holdingValues = computed(() => {
+  return userHoldings.value.map(holding => ({
+    ...holding,
+    marketValue: holding.quantity * holding.currentPrice,
+    profit: (holding.currentPrice - holding.avgPrice) * holding.quantity,
+  }))
 })
 
 // 获取可交易股票列表
@@ -251,6 +279,70 @@ onMounted(() => {
           </el-button>
         </el-form-item>
       </el-form>
+    </el-card>
+    <el-card class="holdings-card mx-auto mt-4 max-w-2xl">
+      <template #header>
+        <div class="text-xl font-bold">
+          股票持仓
+        </div>
+      </template>
+      <el-table
+        :data="holdingValues"
+        stripe
+        style="width: 100%"
+      >
+        <el-table-column
+          prop="symbol"
+          label="代码"
+          min-width="120"
+        />
+        <el-table-column
+          prop="name"
+          label="名称"
+          min-width="180"
+        />
+        <el-table-column
+          label="持仓数量"
+          min-width="120"
+          align="right"
+        >
+          <template #default="{ row }">
+            {{ row.quantity.toLocaleString() }}
+          </template>
+        </el-table-column>
+        <el-table-column
+          label="当前价"
+          min-width="120"
+          align="right"
+        >
+          <template #default="{ row }">
+            {{ row.currentPrice.toFixed(2) }}
+          </template>
+        </el-table-column>
+        <el-table-column
+          label="市值"
+          min-width="140"
+          align="right"
+        >
+          <template #default="{ row }">
+            ¥{{ row.marketValue.toLocaleString(undefined, { maximumFractionDigits: 2 }) }}
+          </template>
+        </el-table-column>
+        <el-table-column
+          label="盈亏"
+          min-width="140"
+          align="right"
+        >
+          <template #default="{ row }">
+            <span :class="{ 'text-green-500': row.profit >= 0, 'text-red-500': row.profit < 0 }">
+              {{ row.profit >= 0 ? '+' : '' }}{{ row.profit.toLocaleString(undefined, { maximumFractionDigits: 2 }) }}
+            </span>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div class="mt-4 text-sm text-gray-500">
+        * 当前为模拟持仓数据，实际功能开发中
+      </div>
     </el-card>
 
     <!-- 交易历史 -->
