@@ -11,6 +11,13 @@ const router = createRouter({
 const authRoutes = [
   '/nav/account',
   '/nav/trade',
+  '/classManage/class',
+  '/classManage/student',
+  '/problemManage/cnki',
+  '/problemManage/wf',
+  '/problemManage/springerlink',
+  '/problemManage/scopus',
+  '/problemManage/ebsco'
 ]
 
 // 无需登录即可访问的路由
