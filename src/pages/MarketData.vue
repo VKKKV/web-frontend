@@ -1,13 +1,14 @@
 <script setup>
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import {onMounted, ref} from 'vue'
+import { onMounted, ref } from 'vue'
 
 const inputCodes = ref('')
 const stockList = ref([])
 const loading = ref(false)
 
-// 分页相关数据 const currentPage = ref(1)
+// 分页相关数据
+const currentPage = ref(1)
 const pageSize = ref(10)
 const totalStocks = ref(0)
 const paginatedStocks = ref([])
@@ -66,26 +67,29 @@ async function fetchStocks() {
   finally {
     loading.value = false
   }
-
-  // 初始化加载分页数据
-  onMounted(() => {
-    fetchPaginatedStocks()
-  })
 }
+
+// 初始化加载分页数据
+onMounted(() => {
+  fetchPaginatedStocks()
+})
 </script>
+
 <template>
   <div class="stock-container">
     <!-- 搜索框 -->
-    <el-input v-model="inputCodes" placeholder="输入港股代码 例：00700,00001" style="width:400px; margin-bottom: 20px;"
-              clearable>
+    <el-input
+      v-model="inputCodes" placeholder="输入港股代码 例：00700,00001" style="width:400px; margin-bottom: 20px;"
+      clearable
+    >
       <template #append>
         <el-button icon="Search" @click="fetchStocks" />
       </template>
     </el-input>
 
-    <!-- 原始搜索结果表格 -->
+    <!-- 搜索结果表格 -->
     <el-table v-if="stockList.length > 0" v-loading="loading" :data="stockList" style="margin-top:20px">
-      <el-table-column prop="stock_code" label="代码" width="120" />
+<!--      <el-table-column prop="stock_code" label="代码" width="120" />-->
       <el-table-column prop="name" label="名称" />
       <el-table-column prop="price" label="当前价格" />
       <el-table-column prop="lastPrice" label="昨日收盘价格" />
@@ -97,19 +101,6 @@ async function fetchStocks() {
         </template>
       </el-table-column>
     </el-table>
-
-<!--    <el-table v-loading="loading" :data="stockList" style="margin-top:20px">-->
-<!--      <el-table-column prop="name" label="名称" />-->
-<!--      <el-table-column prop="price" label="当前价格" />-->
-<!--      <el-table-column prop="lastPrice" label="昨日收盘价格" />-->
-<!--      <el-table-column prop="high" label="当天最高价" />-->
-<!--      <el-table-column prop="low" label="当天最低价" />-->
-<!--      <el-table-column label="更新时间">-->
-<!--        <template #default="{ row }">-->
-<!--          {{ formatTime(row.time) }}-->
-<!--        </template>-->
-<!--      </el-table-column>-->
-<!--    </el-table>-->
 
     <!-- 分页股票列表 -->
     <div class="list-container">
@@ -125,18 +116,22 @@ async function fetchStocks() {
           <el-table-column prop="price" label="当前价格" width="120" />
           <el-table-column label="操作" width="100">
             <template #default="{ row }">
-              <el-button size="small"
-                         :type="favoriteStocks.some(s => s.stock_code === row.stock_code) ? 'danger' : 'primary'"
-                         @click="toggleFavorite(row)">
-                {{favoriteStocks.some(s => s.stock_code === row.stock_code) ? '取消收藏' : '收藏'}}
+              <el-button
+                size="small"
+                :type="favoriteStocks.some(s => s.stock_code === row.stock_code) ? 'danger' : 'primary'"
+                @click="toggleFavorite(row)"
+              >
+                {{ favoriteStocks.some(s => s.stock_code === row.stock_code) ? '取消收藏' : '收藏' }}
               </el-button>
             </template>
           </el-table-column>
         </el-table>
-        <el-pagination class="pagination" :current-page="currentPage" :page-size="pageSize" :page-sizes="[10, 20, 50]"
-                       layout="total, sizes, prev, pager, next" :total="totalStocks"
-                       @current-change="val => { currentPage.value = val; fetchPaginatedStocks() }"
-                       @size-change="val => { pageSize.value = val; fetchPaginatedStocks() }" />
+        <el-pagination
+          class="pagination" :current-page="currentPage" :page-size="pageSize" :page-sizes="[10, 20, 50]"
+          layout="total, sizes, prev, pager, next" :total="totalStocks"
+          @current-change="val => { currentPage.value = val; fetchPaginatedStocks() }"
+          @size-change="val => { pageSize.value = val; fetchPaginatedStocks() }"
+        />
       </el-card>
 
       <!-- 收藏股票列表 -->
