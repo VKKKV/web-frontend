@@ -390,7 +390,7 @@ onMounted(() => {
 
 <style scoped>
 .stock-container {
-  margin: 0 auto;
+  @apply p-4 max-w-7xl mx-auto space-y-4;
 }
 
 .list-container {
