@@ -1,6 +1,9 @@
 <script setup>
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+// 修改pagination事件绑定（新增防抖处理）
+import { debounce } from 'lodash-es'
+
 import { computed, onMounted, ref, watch } from 'vue'
 
 const inputCodes = ref('')
@@ -9,7 +12,7 @@ const loading = ref(false)
 
 // 分页相关数据
 const currentPage = ref(1)
-const pageSize = ref(10)
+const pageSize = ref(8)
 const totalStocks = ref(0)
 const paginatedStocks = ref([])
 
@@ -27,6 +30,46 @@ const priceDisplay = computed(() => {
     }
   }
 })
+
+const allStockCodes = ref([]) // 保存全部股票的代码集合
+const displayedCodes = ref('') // 当前页显示的股票代码集合
+
+async function fetchPaginatedStocks() {
+  try {
+    loading.value = true
+
+    if (allStockCodes.value.length === 0) {
+      const allStocksRes = await axios.get('http://localhost:8080/api/v1/market/getstock/all')
+      allStockCodes.value = allStocksRes.data.codes
+      totalStocks.value = allStockCodes.value.length
+    }
+
+    const start = (currentPage.value - 1) * pageSize.value
+    const end = start + pageSize.value
+    const pageCodes = allStockCodes.value.slice(start, end)
+    displayedCodes.value = pageCodes.join(',')
+
+    // 3. 调用现有接口获取实际数据
+    const response = await axios.get(
+      `http://localhost:8080/api/v1/market/getstock/${displayedCodes.value}`,
+    )
+    // 4. 数据处理匹配分页顺序
+    const stockMap = new Map(response.data.map(s => [s.stock_code, s]))
+    paginatedStocks.value = pageCodes.map(code => ({
+      ...stockMap.get(code),
+      stock_code: code,
+      price: Number(stockMap.get(code)?.price) || 0,
+      lastPrice: Number(stockMap.get(code)?.lastPrice) || 0,
+    }))
+  }
+  catch (err) {
+    ElMessage.error(`分页数据加载失败：${err.message}`)
+  }
+  finally {
+    loading.value = false
+  }
+}
+const handlePaginationChange = debounce(fetchPaginatedStocks, 300)
 
 // 价格计算逻辑函数
 function calcPriceChange(current, previous) {
@@ -178,25 +221,6 @@ watch(
   { deep: true },
 )
 
-// 模拟分页数据
-const allStocks = Array.from({ length: 100 }, (_, i) => ({
-  stock_code: String(i + 1).padStart(5, '0'),
-  name: `股票${i + 1}`,
-  price: (Math.random() * 100).toFixed(2),
-  lastPrice: (Math.random() * 100).toFixed(2),
-  high: (Math.random() * 100).toFixed(2),
-  low: (Math.random() * 100).toFixed(2),
-  time: new Date().toISOString(),
-})).sort((a, b) => a.stock_code - b.stock_code)
-
-// 获取分页股票
-function fetchPaginatedStocks() {
-  const start = (currentPage.value - 1) * pageSize.value
-  const end = start + pageSize.value
-  paginatedStocks.value = allStocks.slice(start, end)
-  totalStocks.value = allStocks.length
-}
-
 function toggleFavorite(stock) {
   const index = favoriteStocks.value.findIndex(
     s => s.stock_code === stock.stock_code,
@@ -257,8 +281,10 @@ onMounted(() => {
     <div class="list-container">
       <el-card class="stock-list">
         <!-- 搜索框 -->
-        <el-input v-model="inputCodes" placeholder="输入代码 例：00700,00001" style="width:400px; margin-bottom: 20px;"
-          clearable>
+        <el-input
+          v-model="inputCodes" placeholder="输入代码 例：00700,00001" style="width:400px; margin-bottom: 20px;"
+          clearable
+        >
           <template #append>
             <el-button icon="Search" @click="fetchStocks" />
           </template>
@@ -308,16 +334,27 @@ onMounted(() => {
           </el-table-column>
           <el-table-column label="操作" width="100">
             <template #default="{ row }">
-              <el-button size="small"
+              <el-button
+                size="small"
                 :type="favoriteStocks.some(s => s.stock_code === row.stock_code) ? 'danger' : 'primary'"
-                @click="toggleFavorite(row)">
-                {{favoriteStocks.some(s => s.stock_code === row.stock_code) ? '取消自选' : '添加自选'}}
+                @click="toggleFavorite(row)"
+              >
+                {{ favoriteStocks.some(s => s.stock_code === row.stock_code) ? '取消自选' : '添加自选' }}
               </el-button>
             </template>
           </el-table-column>
         </el-table>
-        <el-pagination class="pagination" :current-page="currentPage" :page-size="pageSize" layout="prev, pager, next"
-          :total="totalStocks" @current-change="val => { currentPage.value = val; fetchPaginatedStocks() }" />
+
+        <el-pagination
+          class="pagination"
+          :current-page="currentPage"
+          :page-size="pageSize"
+          :page-sizes="[8, 15, 30]"
+          layout="total, sizes, prev, pager, next"
+          :total="totalStocks"
+          @current-change="val => { currentPage.value = val; handlePaginationChange() }"
+          @size-change="val => { pageSize.value = val; handlePaginationChange() }"
+        />
       </el-card>
 
       <!-- 自选股票列表 -->
@@ -353,8 +390,6 @@ onMounted(() => {
 
 <style scoped>
 .stock-container {
-  padding: 20px;
-  max-width: 1400px;
   margin: 0 auto;
 }
 
