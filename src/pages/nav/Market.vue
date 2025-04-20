@@ -530,21 +530,6 @@ onUnmounted(() => {
       </div>
 
       <el-row :gutter="20" class="mt-4">
-<!--        <el-col :span="8">-->
-<!--          <el-card>-->
-<!--            <template #header>-->
-<!--              <div class="font-bold">-->
-<!--                指标选择-->
-<!--              </div>-->
-<!--            </template>-->
-<!--            <el-select v-model="indicator" placeholder="选择技术指标">-->
-<!--              <el-option label="MACD" value="macd" />-->
-<!--              <el-option label="RSI" value="rsi" />-->
-<!--              <el-option label="布林带" value="boll" />-->
-<!--            </el-select>-->
-<!--          </el-card>-->
-<!--        </el-col>-->
-
         <el-col :span="24">
           <el-card>
             <template #header>
@@ -581,7 +566,6 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-/* 修复可能的布局问题 */
 .min-h-screen {
   min-height: 100vh;
 }
