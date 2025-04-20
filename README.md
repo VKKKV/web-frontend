@@ -1,47 +1,83 @@
-# element-plus-vite-starter
+# 股票交易平台前端项目
 
-> A starter kit for Element Plus with Vite
+> 基于 Vue 3 + Element Plus + Vite 构建的证券交易系统前端
 
-- Preview: <https://vite-starter.element-plus.org>
+![项目截图]()
 
-This is an example of on-demand element-plus with [unplugin-vue-components](https://github.com/antfu/unplugin-vue-components).
+## 技术栈
 
-> If you want to import all, it may be so simple that no examples are needed. Just follow [quickstart | Docs](https://element-plus.org/zh-CN/guide/quickstart.html) and import them.
+- 前端框架: Vue 3 + TypeScript
+- UI 组件库: Element Plus
+- 构建工具: Vite
+- 状态管理: Pinia
+- 路由管理: Vue Router
+- HTTP 客户端: Axios
+- 图表库: Klinecharts
 
-If you just want an on-demand import example `manually`, you can check [unplugin-element-plus/examples/vite](https://github.com/element-plus/unplugin-element-plus/tree/main/examples/vite).
+## 功能特性
 
-If you want to a nuxt starter, see [element-plus-nuxt-starter](https://github.com/element-plus/element-plus-nuxt-starter/).
+- 📈 实时股票行情展示（K线图）
+- 💹 模拟股票买卖交易功能
+- 🔐 用户认证系统（登录/注册）
+- 📱 响应式布局
 
-## Project setup
+## 项目结构
+
+```bash
+src/
+├── api/            # API 接口配置
+├── assets/         # 静态资源
+├── components/     # 通用组件
+│   └── layouts/    # 页面布局组件
+├── composables/    # Vue 组合式API
+├── pages/          # 页面组件
+│   ├── Login.vue   # 登录页面
+│   ├── MarketData.vue # 行情页面
+│   └── Trade.vue   # 交易页面
+├── router/         # 路由配置
+├── styles/         # 全局样式
+└── utils/          # 工具函数
+```
+
+## 快速开始
+
+### 环境要求
+
+- Node.js ≥ 16.x
+- pnpm ≥ 7.x
+
+### 安装依赖
 
 ```bash
 pnpm install
-
-# npm install
-# yarn install
 ```
 
-### Compiles and hot-reloads for development
+### 开发模式
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
-### Compiles and minifies for production
+### 生产构建
 
 ```bash
-npm run build
+pnpm build
 ```
 
-## Usage
+### 代码规范检查
 
 ```bash
-git clone https://github.com/element-plus/element-plus-vite-starter
-cd element-plus-vite-starter
-npm i
-npm run dev
+pnpm lint
 ```
 
-### Custom theme
+## 配置说明
 
-See `src/styles/element/index.scss`.
+1. 复制环境变量模板文件：
+```bash
+cp .env.example .env
+```
+2. 修改 `.env` 文件中的 API 端点配置
+
+## 许可证
+
+[MIT License](LICENSE)
