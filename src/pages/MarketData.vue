@@ -197,12 +197,6 @@ async function fetchFavoriteStocks() {
       s._dataStale = true
     })
   }
-  finally {
-    favoriteLoading.value = false
-    // 显示更新完成状态
-    const freshItems = favoriteStocks.value.filter(s => !s._updateFailed)
-    ElMessage.success(`已更新 ${freshItems.length} 支股票最新数据`)
-  }
 }
 
 // 辅助方法：添加本地时间戳
