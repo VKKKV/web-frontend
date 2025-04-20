@@ -170,120 +170,120 @@ onMounted(() => {
 
 <template>
   <div class="trade-container">
-    <div class="mb-4 flex flex-wrap gap-4">
-      <!-- 交易面板 -->
-      <el-card class="flex-1" style="min-width: 400px">
-        <template #header>
-          <div class="text-xl font-bold">
-            股票交易
-          </div>
-        </template>
+    <!-- 交易面板 -->
+    <el-card class="trade-panel">
+      <template #header>
+        <div class="text-xl font-bold">
+          股票交易
+        </div>
+      </template>
 
-        <el-form :model="form" label-width="100px">
-          <el-form-item label="股票代码">
-            <el-select
-              v-model="form.symbol"
-              filterable
-              placeholder="输入股票代码"
-              :loading="!stockList.length"
-              @change="handleSymbolChange"
-            >
-              <el-option
-                v-for="item in stockList"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-          </el-form-item>
-
-          <el-form-item label="买卖方向">
-            <el-radio-group v-model="form.side">
-              <el-radio-button label="BUY">
-                买入
-              </el-radio-button>
-              <el-radio-button label="SELL">
-                卖出
-              </el-radio-button>
-            </el-radio-group>
-          </el-form-item>
-
-          <el-form-item label="委托类型">
-            <el-select
-              v-model="form.orderType"
-              placeholder="请选择委托类型"
-              title="市价委托立即成交，限价委托需指定价格"
-              @change="handleOrderTypeChange"
-            >
-              <el-option label="市价委托" value="MARKET" />
-              <el-option label="限价委托" value="LIMIT" />
-            </el-select>
-            <div class="mt-1 text-xs text-gray-500">
-              * 市价委托：按当前市场最优价立即成交
-              <br>
-              * 限价委托：设置期望成交价格等待匹配
-            </div>
-          </el-form-item>
-
-          <el-form-item
-            label="委托价格"
-            :rules="priceRules"
-            prop="price"
+      <el-form :model="form" label-width="100px">
+        <el-form-item label="股票代码">
+          <el-select
+            v-model="form.symbol"
+            filterable
+            placeholder="输入股票代码"
+            :loading="!stockList.length"
+            @change="handleSymbolChange"
           >
-            <el-input
-              v-model="form.price"
-              :disabled="form.orderType === 'MARKET'"
-              :readonly="form.orderType === 'MARKET'"
-              placeholder="自动生成市场价"
-            >
-              <template v-if="form.orderType === 'MARKET'" #append>
-                <el-tooltip content="点击刷新价格">
-                  <el-icon @click="refreshMarketPrice">
-                    <!-- icon -->
-                    <Refresh />
-                  </el-icon>
-                </el-tooltip>
-              </template>
-            </el-input>
-          </el-form-item>
-
-          <el-form-item v-if="form.orderType === 'LIMIT'" label="价格">
-            <el-input-number
-              v-model="form.price"
-              :precision="2"
-              :min="0.01"
-              :step="0.01"
-              :controls="false"
+            <el-option
+              v-for="item in stockList"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
             />
-          </el-form-item>
+          </el-select>
+        </el-form-item>
 
-          <el-form-item label="数量">
-            <el-input-number
-              v-model="form.quantity"
-              :min="100"
-              :step="100"
-              :controls="false"
-            />
-          </el-form-item>
+        <el-form-item label="买卖方向">
+          <el-radio-group v-model="form.side">
+            <el-radio-button label="BUY">
+              买入
+            </el-radio-button>
+            <el-radio-button label="SELL">
+              卖出
+            </el-radio-button>
+          </el-radio-group>
+        </el-form-item>
 
-          <el-form-item label="price">
-            <span>{{ cost }}</span>
-          </el-form-item>
+        <el-form-item label="委托类型">
+          <el-select
+            v-model="form.orderType"
+            placeholder="请选择委托类型"
+            title="市价委托立即成交，限价委托需指定价格"
+            @change="handleOrderTypeChange"
+          >
+            <el-option label="市价委托" value="MARKET" />
+            <el-option label="限价委托" value="LIMIT" />
+          </el-select>
+          <div class="mt-1 text-xs text-gray-500">
+            * 市价委托：按当前市场最优价立即成交
+            <br>
+            * 限价委托：设置期望成交价格等待匹配
+          </div>
+        </el-form-item>
 
-          <el-form-item>
-            <el-button
-              type="primary"
-              :loading="loading"
-              :icon="Check"
-              @click="submitOrder"
-            >
-              提交委托
-            </el-button>
-          </el-form-item>
-        </el-form>
-      </el-card>
+        <el-form-item
+          label="委托价格"
+          :rules="priceRules"
+          prop="price"
+        >
+          <el-input
+            v-model="form.price"
+            :disabled="form.orderType === 'MARKET'"
+            :readonly="form.orderType === 'MARKET'"
+            placeholder="自动生成市场价"
+          >
+            <template v-if="form.orderType === 'MARKET'" #append>
+              <el-tooltip content="点击刷新价格">
+                <el-icon @click="refreshMarketPrice">
+                  <!-- icon -->
+                  <Refresh />
+                </el-icon>
+              </el-tooltip>
+            </template>
+          </el-input>
+        </el-form-item>
 
-      <el-card class="flex-1" style="min-width: 400px">
+        <el-form-item v-if="form.orderType === 'LIMIT'" label="价格">
+          <el-input-number
+            v-model="form.price"
+            :precision="2"
+            :min="0.01"
+            :step="0.01"
+            :controls="false"
+          />
+        </el-form-item>
+
+        <el-form-item label="数量">
+          <el-input-number
+            v-model="form.quantity"
+            :min="100"
+            :step="100"
+            :controls="false"
+          />
+        </el-form-item>
+
+        <el-form-item label="price">
+          <span>{{ cost }}</span>
+        </el-form-item>
+
+        <el-form-item>
+          <el-button
+            type="primary"
+            :loading="loading"
+            :icon="Check"
+            @click="submitOrder"
+          >
+            提交委托
+          </el-button>
+        </el-form-item>
+      </el-form>
+    </el-card>
+
+    <div class="data-container">
+      <el-card class="data-panel holding-panel">
         <template #header>
           <div class="text-xl font-bold">
             股票持仓
@@ -347,75 +347,123 @@ onMounted(() => {
           * 当前为模拟持仓数据，实际功能开发中
         </div>
       </el-card>
+
+      <!-- 交易历史 -->
+      <el-card class="data-panel history-panel">
+        <template #header>
+          <div class="text-xl font-bold">
+            最近交易记录
+          </div>
+        </template>
+        <el-table
+          v-loading="loading"
+          :data="tradeHistory"
+          height="300"
+          stripe
+          style="width: 100%"
+        >
+          <el-table-column
+            prop="time"
+            label="时间"
+            sortable
+            min-width="180"
+          />
+          <el-table-column
+            prop="symbol"
+            label="代码"
+            min-width="120"
+          />
+          <el-table-column
+            label="方向"
+            min-width="120"
+          >
+            <template #default="{ row }">
+              <el-tag
+                :type="row.side === 'BUY' ? 'success' : 'danger'"
+                class="justify-center"
+              >
+                {{ row.side === 'BUY' ? '买入' : '卖出' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column
+            prop="price"
+            label="价格"
+            min-width="140"
+          >
+            <template #default="{ row }">
+              {{ row.price.toFixed(2) }}
+            </template>
+          </el-table-column>
+          <el-table-column
+            prop="quantity"
+            label="数量"
+            min-width="140"
+          />
+        </el-table>
+      </el-card>
     </div>
-    <!-- 交易历史 -->
-    <el-card>
-      <template #header>
-        <div class="text-xl font-bold">
-          最近交易记录
-        </div>
-      </template>
-      <el-table
-        v-loading="loading"
-        :data="tradeHistory"
-        height="300"
-        stripe
-        style="width: 100%"
-      >
-        <el-table-column
-          prop="time"
-          label="时间"
-          sortable
-          min-width="180"
-        />
-        <el-table-column
-          prop="symbol"
-          label="代码"
-          min-width="120"
-        />
-        <el-table-column
-          label="方向"
-          min-width="120"
-        >
-          <template #default="{ row }">
-            <el-tag
-              :type="row.side === 'BUY' ? 'success' : 'danger'"
-              class="justify-center"
-            >
-              {{ row.side === 'BUY' ? '买入' : '卖出' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="price"
-          label="价格"
-          min-width="140"
-        >
-          <template #default="{ row }">
-            {{ row.price.toFixed(2) }}
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="quantity"
-          label="数量"
-          min-width="140"
-        />
-      </el-table>
-    </el-card>
   </div>
 </template>
 
 <style scoped>
 .trade-container {
-  @apply p-4 max-w-7xl mx-auto; /* 添加容器最大宽度和居中 */
+  @apply p-4 max-w-7xl mx-auto space-y-4;
 }
-.flex-1 {
-  flex: 1 1 50%; /* 两个卡片平分空间 */
+.trade-panel {
+  /* 交易面板样式 */
+  @apply w-full;
+  min-width: 400px;
 }
-/* 响应式调整 */
-@media (max-width: 1024px) {
-  .flex-1 {
-    flex-basis: 100%; /* 小屏幕下垂直堆叠 */
+.data-container {
+  @apply flex flex-wrap gap-4;
+  /* 兼容小屏幕下的堆叠效果 */
+}
+.data-panel {
+  @apply flex-1;
+  min-width: 400px; /* 保持最小宽度 */
+  height: 520px; /* 统一高度 */
+}
+.holding-panel {
+  /* 持仓面板弹性布局 */
+  flex: 1.2; /* 持仓面板稍宽 */
+  min-width: 550px;
+}
+.history-panel {
+  /* 交易记录面板 */
+  flex: 1;
+  min-width: 450px;
+}
+/* 响应式处理 */
+@media (max-width: 1400px) {
+  .holding-panel {
+    min-width: 480px;
   }
+  .history-panel {
+    min-width: 400px;
+  }
+}
+@media (max-width: 1024px) {
+  .data-panel {
+    flex-basis: 100%; /* 小屏幕下垂直排列 */
+    min-width: 100%;
+    height: auto; /* 自动高度 */
+  }
+}
+/* 统一表格高度 */
+.el-table {
+  height: calc(520px - 54px - 20px) !important; /* header高度 + 内边距 */
+}
+@media (max-width: 1024px) {
+  .el-table {
+    height: auto !important;
+  }
+}
+/* 交易表单样式微调 */
+:deep(.el-form-item) {
+  margin-bottom: 18px;
+}
+:deep(.el-form-item__label) {
+  @apply font-medium text-gray-600;
 }
 </style>
