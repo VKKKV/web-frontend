@@ -11,29 +11,32 @@ const loading = ref(false)
 const stockList = ref([])
 const tradeHistory = ref([])
 
+// 安全类型转换
+const safeParseFloat = v => Number.isFinite(+v) ? +v : 0
+// const safeParseInt = v => Math.abs(Number.parseInt(v)) || 0
+
 const form = ref({
-  symbol: '600004',
+  symbol: '00001',
   side: 'BUY',
   orderType: 'MARKET',
-  price: 10,
+  price: 0,
   quantity: 100,
 })
 const cost = computed(() => {
   return (form.value.price || 0) * (form.value.quantity || 0)
 })
 
-const userHoldings = ref([])
-/*
-{
-  symbol: "00001",      // 股票代码
-  name: "长和",         // 股票名称
-  quantity: 1000,       // 总持仓
-  available: 800,       // 可用数量
-  avgPrice: 42.5,       // 平均成本
-  currentPrice: 41.9,   // 当前市价（实时更新）
-  profit: -600          // 浮动盈亏
-}
-*/
+const userHoldings = ref([
+  {
+    symbol: '00001', // 股票代码
+    name: '长和', // 股票名称
+    quantity: 1000, // 总持仓
+    available: 800, // 可用数量
+    avgPrice: 42.5, // 平均成本
+    currentPrice: 41.9, // 当前市价（实时更新）
+    profit: -600, // 浮动盈亏
+  },
+])
 
 // 计算持仓市值
 const holdingValues = computed(() => {
@@ -48,20 +51,20 @@ const holdingValues = computed(() => {
 
 // TODO
 // 获取可交易股票列表
-async function fetchStockList() {
-  try {
-    const response = await axios.get('/api/v1/market/stocks')
-    if (response.data.code === 200) {
-      stockList.value = response.data.data.map(stock => ({
-        value: stock.stockCode,
-        label: `${stock.stockName} (${stock.stockCode})`,
-      }))
-    }
-  }
-  catch (error) {
-    console.error('获取股票列表失败:', error)
-  }
-}
+// async function fetchStockList() {
+//   try {
+//     const response = await axios.get('/api/v1/market/stocks')
+//     if (response.data.code === 200) {
+//       stockList.value = response.data.data.map(stock => ({
+//         value: stock.stockCode,
+//         label: `${stock.stockName} (${stock.stockCode})`,
+//       }))
+//     }
+//   }
+//   catch (error) {
+//     console.error('获取股票列表失败:', error)
+//   }
+// }
 
 // 获取交易历史
 async function fetchTradeHistory() {
@@ -110,20 +113,25 @@ async function submitOrder() {
       return
     }
 
-    const availableQty = holding.quantity - holding.lockedQty
+    const availableQty = holding.available
     if (form.value.quantity > availableQty) {
       ElMessage.warning(`可卖数量不足，当前可用：${availableQty}股`)
       return
     }
   }
   // 数量单位校验
-  const currentStock = stockList.value.find(
-    s => s.value === form.value.symbol,
-  )
-  if (form.value.quantity % (currentStock?.lotSize || 100) !== 0) {
-    ElMessage.warning(`委托数量必须是${currentStock?.lotSize}的整数倍`)
+  // const currentStock = stockList.value.find(
+  //   s => s.value === form.value.symbol,
+  // )
+  // if (form.value.quantity % (currentStock?.lotSize || 100) !== 0) {
+  //   ElMessage.warning(`委托数量必须是${currentStock?.lotSize}的整数倍`)
+  //   return
+  // }
+  if (form.value.quantity % 100 !== 0) {
+    ElMessage.warning(`委托数量必须是100的整数倍`)
     return
   }
+
   loading.value = true
   try {
     const orderData = {
@@ -137,6 +145,7 @@ async function submitOrder() {
     const response = await axios.post('/api/v1/trade/order', orderData)
     if (response.data.code === 200) {
       ElMessage.success('委托提交成功')
+
       // 刷新交易历史
       await fetchTradeHistory()
       await fetchUserHoldings()
@@ -144,7 +153,6 @@ async function submitOrder() {
   }
   catch (error) {
     console.error('提交委托失败:', error)
-    // console.log('错误详情:', error.response?.data)
     ElMessage.error(
       error.response?.data?.message
         ? String(error.response.data.message)
@@ -162,8 +170,8 @@ async function handleSymbolChange(symbol) {
     return
   try {
     const response = await axios.get(`/api/v1/market/getstock/${symbol}`)
-    if (response.data.code === 200) {
-      form.value.price = response.data.data.price
+    if (response.status === 200) {
+      form.value.price = safeParseFloat(response.data[0].price)
     }
   }
   catch (error) {
@@ -184,7 +192,7 @@ async function fetchUserHoldings() {
       if (!holdingsMap[trade.symbol]) {
         holdingsMap[trade.symbol] = {
           symbol: trade.symbol,
-          name: stockList.value.find(s => s.value === trade.symbol)?.label.split('(')[0] || trade.symbol,
+          name: 'err',
           quantity: 0,
           available: 0,
           avgPrice: 0,
@@ -239,14 +247,18 @@ async function updateHoldingsPrice() {
   const codes = userHoldings.value.map(h => h.symbol).join(',')
   try {
     const response = await axios.get(`/api/v1/market/getstock/${codes}`)
-    if (response.data.code === 200) {
+
+    if (response.data && response.data.length > 0) {
       userHoldings.value = userHoldings.value.map((holding) => {
-        const realtimeData = response.data.data.find(
+        const realtimeData = response.data.find(
           s => s.stockCode === holding.symbol,
         )
-        const currentPrice = realtimeData?.lastPrice || holding.currentPrice
+
+
+        const currentPrice = safeParseFloat(realtimeData?.price) || holding.currentPrice
         return {
           ...holding,
+          name: realtimeData.name,
           currentPrice,
           profit: (currentPrice - holding.avgPrice) * holding.quantity,
         }
@@ -258,11 +270,42 @@ async function updateHoldingsPrice() {
   }
 }
 
+// 计算总市值
+// const totalMarketValue = computed(() => {
+//   return userHoldings.value.reduce((total, holding) => {
+//     return total + (holding.currentPrice * holding.quantity)
+//   }, 0)
+// })
+
+// 计算总盈亏
+// const totalProfit = computed(() => {
+//   return userHoldings.value.reduce((total, holding) => {
+//     return total + holding.profit
+//   }, 0)
+// })
+
+// 卖出操作
+function handleSell(symbol) {
+  const holding = userHoldings.value.find(h => h.symbol === symbol)
+  if (holding) {
+    form.value = {
+      ...form.value,
+      symbol: holding.symbol,
+      side: 'SELL',
+      price: holding.currentPrice,
+      quantity: 100, // 默认100股
+    }
+    // 可以滚动到交易面板
+    document.querySelector('.trade-panel')?.scrollIntoView({ behavior: 'smooth' })
+  }
+}
+
 // 初始化加载
 onMounted(() => {
-  fetchStockList()
+  // fetchStockList()
   fetchTradeHistory()
   fetchUserHoldings()
+  handleSymbolChange(form.value.symbol)
   // setInterval(updateHoldingsPrice, 10000) // 每10秒刷新价格
 })
 </script>
@@ -279,20 +322,26 @@ onMounted(() => {
 
       <el-form :model="form" label-width="100px">
         <el-form-item label="股票代码">
-          <el-select
+          <el-input
             v-model="form.symbol"
-            filterable
-            placeholder="输入股票代码"
-            :loading="!stockList.length"
+            placeholder="输入港股代码"
             @change="handleSymbolChange"
-          >
-            <el-option
-              v-for="item in stockList"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value"
-            />
-          </el-select>
+          />
+
+          <!--          <el-select -->
+          <!--            v-model="form.symbol" -->
+          <!--            filterable -->
+          <!--            placeholder="输入股票代码" -->
+          <!--            :loading="!stockList.length" -->
+          <!--            @change="handleSymbolChange" -->
+          <!--          > -->
+          <!--            <el-option -->
+          <!--              v-for="item in stockList" -->
+          <!--              :key="item.value" -->
+          <!--              :label="item.label" -->
+          <!--              :value="item.value" -->
+          <!--            /> -->
+          <!--          </el-select>-->
         </el-form-item>
 
         <el-form-item label="买卖方向">
@@ -364,7 +413,7 @@ onMounted(() => {
           />
         </el-form-item>
 
-        <el-form-item label="成本">
+        <el-form-item :label="form.side === 'BUY' ? '成本' : '所得金额'">
           <span>{{ cost }}</span>
         </el-form-item>
 
@@ -416,15 +465,6 @@ onMounted(() => {
               <div class="text-xs text-gray-500">
                 {{ row.available.toLocaleString() }}可用
               </div>
-            </template>
-          </el-table-column>
-
-          <el-table-column
-            label="成本价"
-            width="120"
-          >
-            <template #default="{ row }">
-              {{ row.avgPrice.toFixed(2) }}
             </template>
           </el-table-column>
 
