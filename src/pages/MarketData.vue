@@ -54,7 +54,7 @@ async function fetchPaginatedStocks() {
       `http://localhost:8080/api/v1/market/getstock/${displayedCodes.value}`,
     )
     // 4. 数据处理匹配分页顺序
-    const stockMap = new Map(response.data.map(s => [s.stock_code, s]))
+    const stockMap = new Map(response.data.map(s => [s.stockCode, s]))
     paginatedStocks.value = pageCodes.map(code => ({
       ...stockMap.get(code),
       stock_code: code,
