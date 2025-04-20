@@ -1,7 +1,7 @@
 <script setup>
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import {computed, onMounted, ref, watch} from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 
 const inputCodes = ref('')
 const stockList = ref([])
@@ -18,15 +18,36 @@ const favoriteLoading = ref(false)
 // 新增计算属性处理价格变化
 const priceDisplay = computed(() => {
   return (stock) => {
+    // price: 股票当前价格
+    // lastPrice: 股票昨天收盘价格
     const change = calcPriceChange(stock?.price, stock?.lastPrice)
     return {
       value: change.formatted,
-      class: change.status
+      class: change.status,
     }
   }
 })
 
-// 从localStorage初始化收藏数据
+// 价格计算逻辑函数
+function calcPriceChange(current, previous) {
+  if (!current || !previous || previous === 0) {
+    return {
+      formatted: '-',
+      percentage: 0,
+      status: 'neutral',
+    }
+  }
+  const diff = current - previous
+  const percentage = (diff / previous) * 100
+  const status = diff > 0 ? 'up' : diff < 0 ? 'down' : 'neutral'
+  return {
+    raw: diff,
+    percentage,
+    formatted: `${diff.toFixed(2)} (${percentage.toFixed(2)}%)`,
+    status,
+  }
+}
+
 function loadFavorites() {
   try {
     return JSON.parse(localStorage.getItem('stockFavorites') || '[]')
@@ -35,6 +56,7 @@ function loadFavorites() {
     return []
   }
 }
+
 const favoriteStocks = ref(loadFavorites())
 // const favoriteStocks = ref([
 //   { stock_code: '00700', name: '腾讯控股', price: 320.0, isFavorite: true },
@@ -58,51 +80,57 @@ async function fetchFavoriteStocks() {
     const response = await axios.get(
       `http://localhost:8080/api/v1/market/getstock/${codes}`,
     )
-    // 创建更安全的数据映射
+    // 创建数据映射
     const stockUpdates = new Map(
       response.data.map((apiStock) => {
+        // 安全类型转换
+        const safeParseFloat = v => Number.isFinite(+v) ? +v : 0
+        const safeParseInt = v => Math.abs(Number.parseInt(v)) || 0
         // 数据清洗与转换
         return [
-          apiStock.stockCode, // 用接口返回的stockCode作为key
+          apiStock.stockCode,
           {
-            stock_code: apiStock.stockCode, // 统一小写格式
+            stock_code: apiStock.stockCode,
             name: apiStock.name,
-            price: Number.parseFloat(apiStock.price) || 0,
-            // 保留额外行情数据
-            latestData: {
-              lastPrice: Number.parseFloat(apiStock.lastPrice),
-              openPrice: Number.parseFloat(apiStock.openPrice),
-              high: Number.parseFloat(apiStock.high),
-              low: Number.parseFloat(apiStock.low),
-              volume: Number.parseInt(apiStock.amount),
-              timestamp: new Date(apiStock.time).getTime(),
-            },
+            price: safeParseFloat(apiStock.price),
+            // 保留的行情数据（直接挂载在根对象）
+            lastPrice: safeParseFloat(apiStock.lastPrice),
+            openPrice: safeParseFloat(apiStock.openPrice),
+            high: safeParseFloat(apiStock.high),
+            low: safeParseFloat(apiStock.low),
+            volume: safeParseInt(apiStock.amount),
+            timestamp: new Date(apiStock.time).getTime() || Date.now(),
+            // 保留原始接口数据结构（可选）
+            _raw: apiStock,
           },
         ]
       }),
     )
-    // 智能合并逻辑
+    // 智能合并逻辑 - 保留本地扩展字段
     favoriteStocks.value = favoriteStocks.value.map((localStock) => {
-      const update = stockUpdates.get(localStock.stock_code)
-
-      // eslint-disable-next-line style/multiline-ternary
-      return update ? {
+      const remoteData = stockUpdates.get(localStock.stock_code)
+      if (!remoteData) {
+        return { ...localStock, _updateFailed: true }
+      }
+      return {
         // 保留本地数据
         ...localStock,
         // 更新核心字段
-        price: update.price,
-        name: update.name || localStock.name, // 保留旧名称防止丢失
-        // 合并更新行情数据（保留历史数据）
-        latestData: {
-          ...(localStock.latestData || {}),
-          ...update.latestData,
-        },
-        // 更新状态标记
+        name: remoteData.name || localStock.name,
+        price: remoteData.price,
+        // 合并行情数据（覆盖式更新）
+        lastPrice: remoteData.lastPrice,
+        openPrice: remoteData.openPrice,
+        high: remoteData.high,
+        low: remoteData.low,
+        volume: remoteData.volume,
+        timestamp: remoteData.timestamp,
+        // 保留原始数据
+        _raw: remoteData._raw,
+        // 状态标记
         _updated: Date.now(),
         _updateFailed: false,
-      } : {
-        ...localStock,
-        _updateFailed: true, // 标记未返回数据的项目
+        _dataStale: false,
       }
     })
     // 增加失败数据处理
@@ -211,28 +239,9 @@ async function fetchStocks() {
   }
 }
 
-// 自动刷新逻辑
-// let autoRefreshTimer = null
-
-// 开启自动刷新
-// function startAutoRefresh(interval = 5000) {
-//   autoRefreshTimer = setInterval(() => {
-//     fetchFavoriteStocks()
-//   }, interval)
-// }
-//
-// // 关闭自动刷新
-// function stopAutoRefresh() {
-//   if (autoRefreshTimer) {
-//     clearInterval(autoRefreshTimer)
-//     autoRefreshTimer = null
-//   }
-// }
-
 onMounted(() => {
   fetchPaginatedStocks()
   fetchFavoriteStocks()
-  // startAutoRefresh()
   // 监听storage事件实现多标签页同步
   window.addEventListener('storage', (e) => {
     if (e.key === 'stockFavorites') {
@@ -240,10 +249,6 @@ onMounted(() => {
     }
   })
 })
-
-// onUnmounted(() => {
-//   stopAutoRefresh()
-// })
 </script>
 
 <template>
@@ -278,7 +283,6 @@ onMounted(() => {
       </el-card>
     </div>
 
-    <!-- 分页股票列表 -->
     <div class="list-container">
       <!-- 股票列表 -->
       <el-card class="stock-list">
@@ -290,7 +294,20 @@ onMounted(() => {
         <el-table v-loading="loading" :data="paginatedStocks" height="400" style="width: 100%">
           <el-table-column prop="stock_code" label="代码" width="120" />
           <el-table-column prop="name" label="名称" />
-          <el-table-column prop="price" label="当前价格" width="120" />
+          <el-table-column prop="price" label="当前价格" width="120">
+            <template #default="{ row }">
+              <span :class="priceDisplay(row).class">
+                {{ row.price }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column label="涨跌幅" width="150">
+            <template #default="{ row }">
+              <span :class="priceDisplay(row).class">
+                {{ priceDisplay(row).value }}
+              </span>
+            </template>
+          </el-table-column>
           <el-table-column label="操作" width="100">
             <template #default="{ row }">
               <el-button
@@ -322,6 +339,13 @@ onMounted(() => {
           <el-table-column prop="stock_code" label="代码" width="120" />
           <el-table-column prop="name" label="名称" />
           <el-table-column prop="price" label="最新价格" width="120" />
+          <el-table-column label="涨跌幅" width="150">
+            <template #default="{ row }">
+              <span :class="priceDisplay(row).class">
+                {{ priceDisplay(row).value }}
+              </span>
+            </template>
+          </el-table-column>
           <el-table-column label="操作" width="100">
             <template #default="{ row }">
               <el-button size="small" type="danger" @click="toggleFavorite(row)">
@@ -373,5 +397,32 @@ onMounted(() => {
   .favorite-list {
     min-width: 100%;
   }
+}
+
+/* 价格变化样式 */
+.up {
+  color: #00b865;
+}
+
+.down {
+  color: #ff4444;
+}
+
+.neutral {
+  color: #999;
+}
+
+.price-cell {
+  display: flex;
+  flex-direction: column;
+}
+
+.current-price {
+  font-weight: 600;
+}
+
+.price-change {
+  font-size: 0.85em;
+  margin-top: 2px;
 }
 </style>
