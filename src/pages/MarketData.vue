@@ -258,7 +258,7 @@ onMounted(() => {
       <el-card class="stock-list">
         <!-- 搜索框 -->
         <el-input
-          v-model="inputCodes" placeholder="输入港股代码 例：00700,00001" style="width:400px; margin-bottom: 20px;"
+          v-model="inputCodes" placeholder="输入代码 例：00700,00001" style="width:400px; margin-bottom: 20px;"
           clearable
         >
           <template #append>
@@ -296,12 +296,12 @@ onMounted(() => {
           <el-table-column prop="name" label="名称" />
           <el-table-column prop="price" label="当前价格" width="120">
             <template #default="{ row }">
-              <span :class="priceDisplay(row).class">
+              <span>
                 {{ row.price }}
               </span>
             </template>
           </el-table-column>
-          <el-table-column label="涨跌幅" width="150">
+          <el-table-column label="日涨跌幅" width="150">
             <template #default="{ row }">
               <span :class="priceDisplay(row).class">
                 {{ priceDisplay(row).value }}
@@ -339,7 +339,7 @@ onMounted(() => {
           <el-table-column prop="stock_code" label="代码" width="120" />
           <el-table-column prop="name" label="名称" />
           <el-table-column prop="price" label="最新价格" width="120" />
-          <el-table-column label="涨跌幅" width="150">
+          <el-table-column label="日涨跌幅" width="150">
             <template #default="{ row }">
               <span :class="priceDisplay(row).class">
                 {{ priceDisplay(row).value }}
