@@ -1,10 +1,8 @@
 <script setup>
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import { onMounted, onUnmounted, ref } from 'vue'
-import { useAuth } from '~/composables/useAuth.js'
+import {computed, onMounted, ref, watch} from 'vue'
 
-const { userId } = useAuth()
 const inputCodes = ref('')
 const stockList = ref([])
 const loading = ref(false)
@@ -15,54 +13,142 @@ const pageSize = ref(10)
 const totalStocks = ref(0)
 const paginatedStocks = ref([])
 
-// 收藏股票数据
-const favoriteStocks = ref([
-  { stock_code: '00700', name: '腾讯控股', price: 320.0, isFavorite: true },
-  { stock_code: '00001', name: '长和', price: 45.6, isFavorite: true },
+const favoriteLoading = ref(false)
 
-])
+// 新增计算属性处理价格变化
+const priceDisplay = computed(() => {
+  return (stock) => {
+    const change = calcPriceChange(stock?.price, stock?.lastPrice)
+    return {
+      value: change.formatted,
+      class: change.status
+    }
+  }
+})
 
-async function fetchFavoriteStocks() {
+// 从localStorage初始化收藏数据
+function loadFavorites() {
   try {
-    loading.value = true
-    const response = await axios.post(
-      `/api/v1/market/getFavoriteStocks/`,
-      {
-        user_id: userId.value,
-      },
-      {
-        timeout: 10000, // 10秒超时
-        headers: {
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-      },
-    )
-    if (response.data.code === 200) {
-      // 数据转换处理
-      favoriteStocks.value = response.data.data.map((stock) => {
-        return {
-          stock_code: stock.stockCode,
-          name: stock.stockName,
-          price: stock.currentPrice,
-          isFavorite: true,
-        }
-      })
-    }
-    else {
-      ElMessage.error(`获取失败：${response.data.message}`)
-    }
+    return JSON.parse(localStorage.getItem('stockFavorites') || '[]')
   }
-  catch (error) {
-    // 错误提示
-    const errorMessage = axios.isCancel(error)
-      ? '请求超时'
-      : error.response?.data?.message || '网络异常，请检查连接'
-    ElMessage.error(`收藏股加载失败：${errorMessage}`)
-  }
-  finally {
-    loading.value = false
+  catch {
+    return []
   }
 }
+const favoriteStocks = ref(loadFavorites())
+// const favoriteStocks = ref([
+//   { stock_code: '00700', name: '腾讯控股', price: 320.0, isFavorite: true },
+//   { stock_code: '00001', name: '长和', price: 45.6, isFavorite: true },
+// ])
+
+// 获取自选股实时数据
+async function fetchFavoriteStocks() {
+  // 检查是否为空
+  if (favoriteStocks.value.length === 0) {
+    ElMessage.warning('当前没有自选股票')
+    return
+  }
+  try {
+    favoriteLoading.value = true
+    const codes = favoriteStocks.value
+      .map(item => encodeURIComponent(item.stock_code))
+      .join(',')
+
+    // 请求实时数据
+    const response = await axios.get(
+      `http://localhost:8080/api/v1/market/getstock/${codes}`,
+    )
+    // 创建更安全的数据映射
+    const stockUpdates = new Map(
+      response.data.map((apiStock) => {
+        // 数据清洗与转换
+        return [
+          apiStock.stockCode, // 用接口返回的stockCode作为key
+          {
+            stock_code: apiStock.stockCode, // 统一小写格式
+            name: apiStock.name,
+            price: Number.parseFloat(apiStock.price) || 0,
+            // 保留额外行情数据
+            latestData: {
+              lastPrice: Number.parseFloat(apiStock.lastPrice),
+              openPrice: Number.parseFloat(apiStock.openPrice),
+              high: Number.parseFloat(apiStock.high),
+              low: Number.parseFloat(apiStock.low),
+              volume: Number.parseInt(apiStock.amount),
+              timestamp: new Date(apiStock.time).getTime(),
+            },
+          },
+        ]
+      }),
+    )
+    // 智能合并逻辑
+    favoriteStocks.value = favoriteStocks.value.map((localStock) => {
+      const update = stockUpdates.get(localStock.stock_code)
+
+      // eslint-disable-next-line style/multiline-ternary
+      return update ? {
+        // 保留本地数据
+        ...localStock,
+        // 更新核心字段
+        price: update.price,
+        name: update.name || localStock.name, // 保留旧名称防止丢失
+        // 合并更新行情数据（保留历史数据）
+        latestData: {
+          ...(localStock.latestData || {}),
+          ...update.latestData,
+        },
+        // 更新状态标记
+        _updated: Date.now(),
+        _updateFailed: false,
+      } : {
+        ...localStock,
+        _updateFailed: true, // 标记未返回数据的项目
+      }
+    })
+    // 增加失败数据处理
+    const failedItems = favoriteStocks.value.filter(s => s._updateFailed)
+    if (failedItems.length > 0) {
+      console.warn('以下股票数据更新失败：', failedItems.map(i => i.stock_code))
+    }
+    // 处理本地时间戳
+    addLocalTimestamp(favoriteStocks.value)
+  }
+  catch (err) {
+    // 增强的错误处理
+    const errorMessage = err.response
+      ? `数据更新失败 (${err.response.status})`
+      : '网络连接异常'
+
+    ElMessage.error(`${errorMessage}，显示最后一次缓存数据`)
+
+    // 标记所有项目为数据陈旧
+    favoriteStocks.value.forEach((s) => {
+      s._dataStale = true
+    })
+  }
+  finally {
+    favoriteLoading.value = false
+    // 显示更新完成状态
+    const freshItems = favoriteStocks.value.filter(s => !s._updateFailed)
+    ElMessage.success(`已更新 ${freshItems.length} 支股票最新数据`)
+  }
+}
+
+// 辅助方法：添加本地时间戳
+function addLocalTimestamp(stocks) {
+  const now = Date.now()
+  stocks.forEach((stock) => {
+    stock.localTimestamp = now
+  })
+}
+
+watch(
+  favoriteStocks,
+  (newVal) => {
+    localStorage.setItem('stockFavorites', JSON.stringify(newVal))
+  },
+  { deep: true },
+)
 
 // 模拟分页数据
 const allStocks = Array.from({ length: 100 }, (_, i) => ({
@@ -83,118 +169,29 @@ function fetchPaginatedStocks() {
   totalStocks.value = allStocks.length
 }
 
-// 典型的操作流程时序
-// 用户点击 → 本地立即更新 → 发起请求 → 成功：同步远端数据 / 失败：恢复本地数据
-
-async function cancelFavorite(stockCode) {
-  let originalList
-  try {
-    // 乐观更新：先移除本地数据
-    originalList = [...favoriteStocks.value]
-    favoriteStocks.value = favoriteStocks.value.filter(
-      item => item.stock_code !== stockCode,
-    )
-
-    const response = await axios.post(
-      '/api/v1/market/favorite/cancel',
-      {
-        user_id: userId.value,
-        stock_code: stockCode,
-        // timestamp: Date.now(), // 防重放
-      },
-      {
-        timeout: 5000,
-        headers: {
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-      },
-    )
-    if (response.data.code !== 200) {
-      throw new Error(response.data.message || '操作失败')
-    }
-    ElMessage.success('取消收藏成功')
-    // 主动刷新最新数据
-    await fetchFavoriteStocks()
-  }
-  catch (error) {
-    // 错误回退
-    favoriteStocks.value = originalList
-    console.error('取消收藏失败:', error)
-  }
-}
-
-// 防抖 防止重复点击
-// const debouncedCancelFavorite = debounce(cancelFavorite, 500)
-
-// 防抖函数
-// function debounce(fn, delay) {
-//   let timer = null
-//   return (...args) => {
-//     if (timer)
-//       clearTimeout(timer)
-//     timer = setTimeout(() => fn(...args), delay)
-//   }
-// }
-
-// 切换收藏状态
-async function toggleFavorite(stock) {
-  // 先进行本地状态判断
-  const existingIndex = favoriteStocks.value.findIndex(
+function toggleFavorite(stock) {
+  const index = favoriteStocks.value.findIndex(
     s => s.stock_code === stock.stock_code,
   )
-  // 取消收藏流程
-  if (existingIndex > -1) {
-    await cancelFavorite(stock.stock_code) // 调用取消收藏函数
-    return
-  }
-  // 新增收藏流程
-  try {
-    // 乐观更新：先添加本地数据
+  if (index === -1) {
+    // 添加收藏
     favoriteStocks.value.push({
-      ...stock,
+      stock_code: stock.stock_code,
+      name: stock.name,
+      price: stock.price,
       isFavorite: true,
-      _pending: true, // 标记为请求中状态
+      addedAt: Date.now(),
     })
-    // 调用新增收藏接口
-    const response = await axios.post(
-      `/api/v1/market/favorite/${userId.value}`,
-      {
-        stock_code: stock.stock_code,
-        name: stock.name,
-      },
-      {
-        timeout: 5000,
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-      },
-    )
-    if (response.data.code === 200) {
-      // 更新完整数据
-      const index = favoriteStocks.value.findIndex(
-        s => s.stock_code === stock.stock_code,
-      )
-      if (index > -1) {
-        favoriteStocks.value[index] = {
-          ...response.data.data,
-          isFavorite: true,
-          _pending: false,
-        }
-      }
-    }
+    ElMessage.success('已添加收藏')
   }
-  catch (error) {
-    console.error('添加收藏失败:', error)
-    // 回滚操作：移除未成功添加的项目
-    const rollbackIndex = favoriteStocks.value.findIndex(
-      s => s.stock_code === stock.stock_code,
-    )
-    if (rollbackIndex > -1) {
-      favoriteStocks.value.splice(rollbackIndex, 1)
-    }
-    ElMessage.error(`添加收藏失败：${error.response?.data?.message || '未知错误'}`)
+  else {
+    // 取消收藏
+    favoriteStocks.value.splice(index, 1)
+    ElMessage.success('已取消收藏')
   }
 }
 
-const formatTime = t => t.replace(/\//g, '-') // 时间格式化
+const formatTime = t => t.replace(/\//g, '-')
 
 async function fetchStocks() {
   if (!inputCodes.value.trim())
@@ -214,18 +211,39 @@ async function fetchStocks() {
   }
 }
 
-// 添加自动刷新
-let refreshTimer = null
+// 自动刷新逻辑
+// let autoRefreshTimer = null
+
+// 开启自动刷新
+// function startAutoRefresh(interval = 5000) {
+//   autoRefreshTimer = setInterval(() => {
+//     fetchFavoriteStocks()
+//   }, interval)
+// }
+//
+// // 关闭自动刷新
+// function stopAutoRefresh() {
+//   if (autoRefreshTimer) {
+//     clearInterval(autoRefreshTimer)
+//     autoRefreshTimer = null
+//   }
+// }
+
 onMounted(() => {
   fetchPaginatedStocks()
   fetchFavoriteStocks()
-  // 每30秒自动刷新
-  refreshTimer = setInterval(fetchFavoriteStocks, 30000)
+  // startAutoRefresh()
+  // 监听storage事件实现多标签页同步
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'stockFavorites') {
+      favoriteStocks.value = JSON.parse(e.newValue || '[]')
+    }
+  })
 })
 
-onUnmounted(() => {
-  clearInterval(refreshTimer)
-})
+// onUnmounted(() => {
+//   stopAutoRefresh()
+// })
 </script>
 
 <template>
@@ -280,7 +298,7 @@ onUnmounted(() => {
                 :type="favoriteStocks.some(s => s.stock_code === row.stock_code) ? 'danger' : 'primary'"
                 @click="toggleFavorite(row)"
               >
-                {{ favoriteStocks.some(s => s.stock_code === row.stock_code) ? '取消收藏' : '收藏' }}
+                {{ favoriteStocks.some(s => s.stock_code === row.stock_code) ? '取消自选' : '添加自选' }}
               </el-button>
             </template>
           </el-table-column>
@@ -306,7 +324,7 @@ onUnmounted(() => {
           <el-table-column prop="price" label="最新价格" width="120" />
           <el-table-column label="操作" width="100">
             <template #default="{ row }">
-              <el-button size="small" type="danger" @click="cancelFavorite(row)">
+              <el-button size="small" type="danger" @click="toggleFavorite(row)">
                 取消自选
               </el-button>
             </template>
