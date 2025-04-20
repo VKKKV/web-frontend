@@ -257,10 +257,8 @@ onMounted(() => {
     <div class="list-container">
       <el-card class="stock-list">
         <!-- 搜索框 -->
-        <el-input
-          v-model="inputCodes" placeholder="输入代码 例：00700,00001" style="width:400px; margin-bottom: 20px;"
-          clearable
-        >
+        <el-input v-model="inputCodes" placeholder="输入代码 例：00700,00001" style="width:400px; margin-bottom: 20px;"
+          clearable>
           <template #append>
             <el-button icon="Search" @click="fetchStocks" />
           </template>
@@ -310,22 +308,16 @@ onMounted(() => {
           </el-table-column>
           <el-table-column label="操作" width="100">
             <template #default="{ row }">
-              <el-button
-                size="small"
+              <el-button size="small"
                 :type="favoriteStocks.some(s => s.stock_code === row.stock_code) ? 'danger' : 'primary'"
-                @click="toggleFavorite(row)"
-              >
-                {{ favoriteStocks.some(s => s.stock_code === row.stock_code) ? '取消自选' : '添加自选' }}
+                @click="toggleFavorite(row)">
+                {{favoriteStocks.some(s => s.stock_code === row.stock_code) ? '取消自选' : '添加自选'}}
               </el-button>
             </template>
           </el-table-column>
         </el-table>
-        <el-pagination
-          class="pagination" :current-page="currentPage" :page-size="pageSize" :page-sizes="[10, 20, 50]"
-          layout="total, sizes, prev, pager, next" :total="totalStocks"
-          @current-change="val => { currentPage.value = val; fetchPaginatedStocks() }"
-          @size-change="val => { pageSize.value = val; fetchPaginatedStocks() }"
-        />
+        <el-pagination class="pagination" :current-page="currentPage" :page-size="pageSize" layout="prev, pager, next"
+          :total="totalStocks" @current-change="val => { currentPage.value = val; fetchPaginatedStocks() }" />
       </el-card>
 
       <!-- 自选股票列表 -->
