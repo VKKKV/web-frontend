@@ -1,32 +1,526 @@
 <script setup>
-
 import axios from 'axios'
-import { ElLoading, ElMessage } from 'element-plus'
-import { dispose, init } from 'klinecharts'
-import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import {ElMessage} from 'element-plus'
+import {formatTime} from 'element-plus/es/components/countdown/src/utils'
+import {dispose, init} from 'klinecharts'
+import {computed, onMounted, onUnmounted, ref, shallowRef, watch} from 'vue'
+import {useRoute} from 'vue-router'
 
 const route = useRoute()
 const chart = shallowRef(null)
 const ws = shallowRef(null)
-const selectedSymbol = ref('AAPL') // 当前展示的股票代码
-const indicator = ref('') // 添加缺失的indicator变量
-const realtimeData = ref([]) // 添加缺失的realtimeData变量
+const selectedSymbol = ref('00001') // 当前展示的股票代码
+const indicator = ref('')
 const isConnected = ref(false) // 添加连接状态变量
 const useTestData = ref(true) // 是否使用测试数据
 const searchInput = ref('') // 搜索输入
 const stockOptions = ref([]) // 可选股票列表
 const isLoadingStocks = ref(false) // 加载股票列表状态
+const styles = {
+  grid: {
+    show: true,
+    horizontal: {
+      show: true,
+      size: 1,
+      color: '#EDEDED',
+      style: 'dashed',
+      dashedValue: [2, 2],
+    },
+    vertical: {
+      show: true,
+      size: 1,
+      color: '#EDEDED',
+      style: 'dashed',
+      dashedValue: [2, 2],
+    },
+  },
+  candle: {
+    // 'candle_solid' | 'candle_stroke' | 'candle_up_stroke' | 'candle_down_stroke' | 'ohlc' | 'area'
+    type: 'candle_solid',
+    bar: {
+      // 'current_open' | 'previous_close'
+      compareRule: 'current_open',
+      upColor: '#2DC08E',
+      downColor: '#F92855',
+      noChangeColor: '#888888',
+      upBorderColor: '#2DC08E',
+      downBorderColor: '#F92855',
+      noChangeBorderColor: '#888888',
+      upWickColor: '#2DC08E',
+      downWickColor: '#F92855',
+      noChangeWickColor: '#888888',
+    },
+    area: {
+      lineSize: 2,
+      lineColor: '#2196F3',
+      smooth: false,
+      value: 'close',
+      backgroundColor: [{
+        offset: 0,
+        color: 'rgba(33, 150, 243, 0.01)',
+      }, {
+        offset: 1,
+        color: 'rgba(33, 150, 243, 0.2)',
+      }],
+      point: {
+        show: true,
+        color: '#2196F3',
+        radius: 4,
+        rippleColor: 'rgba(33, 150, 243, 0.3)',
+        rippleRadius: 8,
+        animation: true,
+        animationDuration: 1000,
+      },
+    },
+    priceMark: {
+      show: true,
+      high: {
+        show: true,
+        color: '#D9D9D9',
+        textMargin: 5,
+        textSize: 10,
+        textFamily: 'Helvetica Neue',
+        textWeight: 'normal',
+      },
+      low: {
+        show: true,
+        color: '#D9D9D9',
+        textMargin: 5,
+        textSize: 10,
+        textFamily: 'Helvetica Neue',
+        textWeight: 'normal',
+      },
+      last: {
+        show: true,
+        // 'current_open' | 'previous_close'
+        compareRule: 'current_open',
+        upColor: '#2DC08E',
+        downColor: '#F92855',
+        noChangeColor: '#888888',
+        line: {
+          show: true,
+          // 'solid' | 'dashed'
+          style: 'dashed',
+          dashedValue: [4, 4],
+          size: 1,
+        },
+        text: {
+          show: true,
+          // 'fill' | 'stroke' | 'stroke_fill'
+          style: 'fill',
+          size: 12,
+          paddingLeft: 4,
+          paddingTop: 4,
+          paddingRight: 4,
+          paddingBottom: 4,
+          // 'solid' | 'dashed'
+          borderStyle: 'solid',
+          borderSize: 0,
+          borderColor: 'transparent',
+          borderDashedValue: [2, 2],
+          color: '#FFFFFF',
+          family: 'Helvetica Neue',
+          weight: 'normal',
+          borderRadius: 2,
+        },
+      },
+    },
+    tooltip: {
+      offsetLeft: 4,
+      offsetTop: 6,
+      offsetRight: 4,
+      offsetBottom: 6,
+      // 'always' | 'follow_cross' | 'none'
+      showRule: 'always',
+      // 'standard' | 'rect'
+      showType: 'standard',
+      // e.g.
+      // [{ title: 'time', value: '{time}' }, { title: 'close', value: '{close}' }]
+      // [{ title: { text: 'time', color: '#fff' }, value: { text: '{time}', color: '#fff' } }, { title: 'close', value: '{close}' }]
+      custom: [
+        {title: 'time', value: '{time}'},
+        {title: 'open', value: '{open}'},
+        {title: 'high', value: '{high}'},
+        {title: 'low', value: '{low}'},
+        {title: 'close', value: '{close}'},
+        {title: 'volume', value: '{volume}'},
+      ],
+      defaultValue: 'n/a',
+      rect: {
+        // 'fixed' | 'pointer'
+        position: 'fixed',
+        paddingLeft: 4,
+        paddingRight: 4,
+        paddingTop: 4,
+        paddingBottom: 4,
+        offsetLeft: 4,
+        offsetTop: 4,
+        offsetRight: 4,
+        offsetBottom: 4,
+        borderRadius: 4,
+        borderSize: 1,
+        borderColor: '#f2f3f5',
+        color: '#FEFEFE',
+      },
+      text: {
+        size: 12,
+        family: 'Helvetica Neue',
+        weight: 'normal',
+        color: '#D9D9D9',
+        marginLeft: 8,
+        marginTop: 4,
+        marginRight: 8,
+        marginBottom: 4,
+      },
+    },
+  },
+  indicator: {
+    ohlc: {
+      // 'current_open' | 'previous_close'
+      compareRule: 'current_open',
+      upColor: 'rgba(45, 192, 142, .7)',
+      downColor: 'rgba(249, 40, 85, .7)',
+      noChangeColor: '#888888',
+    },
+    bars: [{
+      // 'fill' | 'stroke' | 'stroke_fill'
+      style: 'fill',
+      // 'solid' | 'dashed'
+      borderStyle: 'solid',
+      borderSize: 1,
+      borderDashedValue: [2, 2],
+      upColor: 'rgba(45, 192, 142, .7)',
+      downColor: 'rgba(249, 40, 85, .7)',
+      noChangeColor: '#888888',
+    }],
+    lines: [
+      {
+        // 'solid' | 'dashed'
+        style: 'solid',
+        smooth: false,
+        size: 1,
+        dashedValue: [2, 2],
+        color: '#FF9600',
+      },
+      {
+        style: 'solid',
+        smooth: false,
+        size: 1,
+        dashedValue: [2, 2],
+        color: '#935EBD',
+      },
+      {
+        style: 'solid',
+        smooth: false,
+        size: 1,
+        dashedValue: [2, 2],
+        color: '#2196F3',
+      },
+      {
+        style: 'solid',
+        smooth: false,
+        size: 1,
+        dashedValue: [2, 2],
+        color: '#E11D74',
+      },
+      {
+        style: 'solid',
+        smooth: false,
+        size: 1,
+        dashedValue: [2, 2],
+        color: '#01C5C4',
+      },
+    ],
+    circles: [{
+      // 'fill' | 'stroke' | 'stroke_fill'
+      style: 'fill',
+      // 'solid' | 'dashed'
+      borderStyle: 'solid',
+      borderSize: 1,
+      borderDashedValue: [2, 2],
+      upColor: 'rgba(45, 192, 142, .7)',
+      downColor: 'rgba(249, 40, 85, .7)',
+      noChangeColor: '#888888',
+    }],
+    lastValueMark: {
+      show: false,
+      text: {
+        show: false,
+        // 'fill' | 'stroke' | 'stroke_fill'
+        style: 'fill',
+        color: '#FFFFFF',
+        size: 12,
+        family: 'Helvetica Neue',
+        weight: 'normal',
+        // 'solid' | 'dashed'
+        borderStyle: 'solid',
+        borderSize: 1,
+        borderDashedValue: [2, 2],
+        paddingLeft: 4,
+        paddingTop: 4,
+        paddingRight: 4,
+        paddingBottom: 4,
+        borderRadius: 2,
+      },
+    },
+    tooltip: {
+      offsetLeft: 4,
+      offsetTop: 6,
+      offsetRight: 4,
+      offsetBottom: 6,
+      // 'always' | 'follow_cross' | 'none'
+      showRule: 'always',
+      // 'standard' | 'rect'
+      showType: 'standard',
+      showName: true,
+      showParams: true,
+      defaultValue: 'n/a',
+      text: {
+        size: 12,
+        family: 'Helvetica Neue',
+        weight: 'normal',
+        color: '#D9D9D9',
+        marginTop: 4,
+        marginRight: 8,
+        marginBottom: 4,
+        marginLeft: 8,
+      },
+      features: [],
+    },
+  },
+  xAxis: {
+    show: true,
+    size: 'auto',
+    axisLine: {
+      show: true,
+      color: '#888888',
+      size: 1,
+    },
+    tickText: {
+      show: true,
+      color: '#D9D9D9',
+      family: 'Helvetica Neue',
+      weight: 'normal',
+      size: 12,
+      marginStart: 4,
+      marginEnd: 4,
+    },
+    tickLine: {
+      show: true,
+      size: 1,
+      length: 3,
+      color: '#888888',
+    },
+  },
+  yAxis: {
+    show: true,
+    size: 'auto',
+    // 'left' | 'right'
+    position: 'right',
+    // 'normal' | 'percentage' | 'log'
+    type: 'normal',
+    inside: false,
+    reverse: false,
+    axisLine: {
+      show: true,
+      color: '#888888',
+      size: 1,
+    },
+    tickText: {
+      show: true,
+      color: '#D9D9D9',
+      family: 'Helvetica Neue',
+      weight: 'normal',
+      size: 12,
+      marginStart: 4,
+      marginEnd: 4,
+    },
+    tickLine: {
+      show: true,
+      size: 1,
+      length: 3,
+      color: '#888888',
+    },
+  },
+  separator: {
+    size: 1,
+    color: '#888888',
+    fill: true,
+    activeBackgroundColor: 'rgba(230, 230, 230, .15)',
+  },
+  crosshair: {
+    show: true,
+    horizontal: {
+      show: true,
+      line: {
+        show: true,
+        // 'solid' | 'dashed'
+        style: 'dashed',
+        dashedValue: [4, 2],
+        size: 1,
+        color: '#888888',
+      },
+      text: {
+        show: true,
+        // 'fill' | 'stroke' | 'stroke_fill'
+        style: 'fill',
+        color: '#FFFFFF',
+        size: 12,
+        family: 'Helvetica Neue',
+        weight: 'normal',
+        // 'solid' | 'dashed'
+        borderStyle: 'solid',
+        borderDashedValue: [2, 2],
+        borderSize: 1,
+        borderColor: '#686D76',
+        borderRadius: 2,
+        paddingLeft: 4,
+        paddingRight: 4,
+        paddingTop: 4,
+        paddingBottom: 4,
+        backgroundColor: '#686D76',
+      },
+    },
+    vertical: {
+      show: true,
+      line: {
+        show: true,
+        // 'solid'|'dashed'
+        style: 'dashed',
+        dashedValue: [4, 2],
+        size: 1,
+        color: '#888888',
+      },
+      text: {
+        show: true,
+        // 'fill' | 'stroke' | 'stroke_fill'
+        style: 'fill',
+        color: '#FFFFFF',
+        size: 12,
+        family: 'Helvetica Neue',
+        weight: 'normal',
+        // 'solid' | 'dashed'
+        borderStyle: 'solid',
+        borderDashedValue: [2, 2],
+        borderSize: 1,
+        borderColor: '#686D76',
+        borderRadius: 2,
+        paddingLeft: 4,
+        paddingRight: 4,
+        paddingTop: 4,
+        paddingBottom: 4,
+        backgroundColor: '#686D76',
+      },
+    },
+  },
+  overlay: {
+    point: {
+      color: '#1677FF',
+      borderColor: 'rgba(22, 119, 255, 0.35)',
+      borderSize: 1,
+      radius: 5,
+      activeColor: '#1677FF',
+      activeBorderColor: 'rgba(22, 119, 255, 0.35)',
+      activeBorderSize: 3,
+      activeRadius: 5,
+    },
+    line: {
+      // 'solid' | 'dashed'
+      style: 'solid',
+      smooth: false,
+      color: '#1677FF',
+      size: 1,
+      dashedValue: [2, 2],
+    },
+    rect: {
+      // 'fill' | 'stroke' | 'stroke_fill'
+      style: 'fill',
+      color: 'rgba(22, 119, 255, 0.25)',
+      borderColor: '#1677FF',
+      borderSize: 1,
+      borderRadius: 0,
+      // 'solid' | 'dashed'
+      borderStyle: 'solid',
+      borderDashedValue: [2, 2],
+    },
+    polygon: {
+      // 'fill' | 'stroke' | 'stroke_fill'
+      style: 'fill',
+      color: '#1677FF',
+      borderColor: '#1677FF',
+      borderSize: 1,
+      // 'solid' | 'dashed'
+      borderStyle: 'solid',
+      borderDashedValue: [2, 2],
+    },
+    circle: {
+      // 'fill' | 'stroke' | 'stroke_fill'
+      style: 'fill',
+      color: 'rgba(22, 119, 255, 0.25)',
+      borderColor: '#1677FF',
+      borderSize: 1,
+      // 'solid' | 'dashed'
+      borderStyle: 'solid',
+      borderDashedValue: [2, 2],
+    },
+    arc: {
+      // 'solid' | 'dashed'
+      style: 'solid',
+      color: '#1677FF',
+      size: 1,
+      dashedValue: [2, 2],
+    },
+    text: {
+      // 'fill' | 'stroke' | 'stroke_fill'
+      style: 'fill',
+      color: '#FFFFFF',
+      size: 12,
+      family: 'Helvetica Neue',
+      weight: 'normal',
+      // 'solid' | 'dashed'
+      borderStyle: 'solid',
+      borderDashedValue: [2, 2],
+      borderSize: 0,
+      borderRadius: 2,
+      borderColor: '#1677FF',
+      paddingLeft: 0,
+      paddingRight: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
+      backgroundColor: '#1677FF',
+    },
+  },
+}
+
+const realtimeData = ref([{
+  lotSize: 100.0,
+  name: '长和',
+  price: 43.3,
+  lastPrice: 42.15,
+  openPrice: 42.25,
+  amount: 10434592.0,
+  time: '2025/04/22 16:08:14',
+  dtd: 2.73,
+  high: 43.5,
+  low: 42.2,
+},
+])
+
+// <el-table-column prop="time" label="时间" />
+// <el-table-column prop="volume" label="成交量" />
+// <el-table-column prop="price" label="当前价格" />
+// <el-table-column prop="lastPrice" label="昨日收盘价格" />
+// <el-table-column prop="high" label="当天最高价" />
+// <el-table-column prop="low" label="当天最低价" />
 
 // 从后端获取股票列表
 async function fetchStockList() {
   isLoadingStocks.value = true
   try {
-    // 显示加载动画
-    const loadingInstance = ElLoading.service({
-      target: '.stock-search-container',
-      text: '加载股票列表...',
-    })
+    // const loadingInstance = ElLoading.service({
+    //   target: '.stock-search-container',
+    //   text: '加载股票列表...',
+    // })
 
     // 从后端API获取股票列表
     const response = await axios.get('/api/v1/market/stocks')
@@ -34,22 +528,19 @@ async function fetchStockList() {
     // 处理响应数据
     if (response.data && Array.isArray(response.data.stocks)) {
       stockOptions.value = response.data.stocks
-    }
-    else {
+    } else {
       // 如果API返回格式不符合预期，使用默认数据
       console.warn('后端返回的股票数据格式不符合预期，使用默认数据')
       stockOptions.value = getDefaultStocks()
     }
 
-    loadingInstance.close()
-  }
-  catch (error) {
+    // loadingInstance.close()
+  } catch (error) {
     console.error('获取股票列表失败:', error)
     ElMessage.error('获取股票列表失败，使用默认数据')
     // 加载失败时使用默认数据
     stockOptions.value = getDefaultStocks()
-  }
-  finally {
+  } finally {
     isLoadingStocks.value = false
   }
 }
@@ -57,11 +548,12 @@ async function fetchStockList() {
 // 默认股票数据（当API请求失败时使用）
 function getDefaultStocks() {
   return [
-    { value: 'AAPL', label: '苹果 (AAPL)', market: '纳斯达克', industry: '科技' },
-    { value: 'MSFT', label: '微软 (MSFT)', market: '纳斯达克', industry: '科技' },
-    { value: 'GOOGL', label: '谷歌 (GOOGL)', market: '纳斯达克', industry: '科技' },
-    { value: 'AMZN', label: '亚马逊 (AMZN)', market: '纳斯达克', industry: '电商' },
-    { value: 'TSLA', label: '特斯拉 (TSLA)', market: '纳斯达克', industry: '汽车' },
+    {value: 'AAPL', label: '苹果 (AAPL)', market: '纳斯达克', industry: '科技'},
+    {value: 'MSFT', label: '微软 (MSFT)', market: '纳斯达克', industry: '科技'},
+    {value: 'GOOGL', label: '谷歌 (GOOGL)', market: '纳斯达克', industry: '科技'},
+    {value: 'AMZN', label: '亚马逊 (AMZN)', market: '纳斯达克', industry: '电商'},
+    {value: 'TSLA', label: '特斯拉 (TSLA)', market: '纳斯达克', industry: '汽车'},
+    {value: '00001', label: '长和', market: '港股'},
   ]
 }
 
@@ -70,10 +562,10 @@ function filterStocks(queryString) {
   if (queryString) {
     const lowercaseQuery = queryString.toLowerCase()
     return stockOptions.value.filter(
-      stock => stock.value.toLowerCase().includes(lowercaseQuery)
-        || stock.label.toLowerCase().includes(lowercaseQuery)
-        || (stock.industry && stock.industry.toLowerCase().includes(lowercaseQuery))
-        || (stock.market && stock.market.toLowerCase().includes(lowercaseQuery)),
+        stock => stock.value.toLowerCase().includes(lowercaseQuery)
+            || stock.label.toLowerCase().includes(lowercaseQuery)
+            || (stock.industry && stock.industry.toLowerCase().includes(lowercaseQuery))
+            || (stock.market && stock.market.toLowerCase().includes(lowercaseQuery)),
     )
   }
   return stockOptions.value
@@ -87,8 +579,7 @@ function handleSelect(item) {
     if (stock) {
       switchStock(stock.value)
     }
-  }
-  else {
+  } else {
     // 如果选择了下拉菜单中的项目
     switchStock(item.value)
   }
@@ -110,7 +601,7 @@ const currentStockName = computed(() => {
 // 获取当前股票信息
 const currentStockInfo = computed(() => {
   const stock = stockOptions.value.find(s => s.value === selectedSymbol.value)
-  return stock && stock.market ? `${stock.market} | ${stock.industry}` : ''
+  return stock && stock.market ? `${stock.market} | ${stock.value}` : ''
 })
 
 let reconnectAttempts = 0
@@ -137,7 +628,7 @@ function createWebSocketConnection() {
       // 增加心跳检测机制
       setInterval(() => {
         if (ws.value && ws.value.readyState === WebSocket.OPEN) {
-          ws.value.send(JSON.stringify({ type: 'ping' }))
+          ws.value.send(JSON.stringify({type: 'ping'}))
         }
       }, 30000)
 
@@ -148,7 +639,7 @@ function createWebSocketConnection() {
       subscribeToStock(selectedSymbol.value)
     }
 
-    ws.value.onmessage = ({ data }) => {
+    ws.value.onmessage = ({data}) => {
       try {
         let payload
 
@@ -157,8 +648,7 @@ function createWebSocketConnection() {
           const decoder = new TextDecoder()
           const jsonStr = decoder.decode(data)
           payload = JSON.parse(jsonStr)
-        }
-        else {
+        } else {
           payload = JSON.parse(data)
         }
 
@@ -188,8 +678,7 @@ function createWebSocketConnection() {
         if (realtimeData.value.length > 10) {
           realtimeData.value = realtimeData.value.slice(0, 10)
         }
-      }
-      catch (error) {
+      } catch (error) {
         ElMessage.error('处理WebSocket消息时出错:', error)
       }
     }
@@ -211,8 +700,7 @@ function createWebSocketConnection() {
     ws.value.onerror = (error) => {
       console.error('WebSocket错误:', error)
     }
-  }
-  catch (error) {
+  } catch (error) {
     console.error('创建WebSocket连接时出错:', error)
   }
 }
@@ -294,60 +782,90 @@ function initChart() {
   chart.value = init('chart-container')
 
   // 设置图表样式
-  chart.value.setStyles({
-    grid: {
-      show: true,
-      horizontal: {
-        show: true,
-        size: 1,
-        color: '#EDEDED',
-        style: 'solid',
-      },
-      vertical: {
-        show: true,
-        size: 1,
-        color: '#EDEDED',
-        style: 'solid',
-      },
+  chart.value.setStyles(styles)
+
+  const initialData = [
+    { // 起始交易日 6/1
+      open: 30.50,
+      high: 30.80,
+      low: 30.20,
+      close: 30.60,
+      volume: 1584000, // 15.84万股
+      timestamp: 1717192800000 // 2024-06-01 16:00:00 GMT+8
     },
-    candle: {
-      type: 'candle_solid',
-      bar: {
-        upColor: '#26A69A',
-        downColor: '#EF5350',
-        noChangeColor: '#888888',
-      },
-      area: {
-        lineSize: 2,
-        lineColor: '#2196F3',
-        value: 'close',
-        backgroundColor: 'rgba(33, 150, 243, 0.1)',
-      },
+    { // 6/2 突破上涨
+      open: 30.60,
+      high: 31.20,
+      low: 30.50,
+      close: 31.10, // 收涨1.63%
+      volume: 2245000,
+      timestamp: 1717279200000
     },
-  })
-
-  // 创建一些初始数据，以便图表能够显示
-  const timestamp = Date.now()
-  const basePrice = getBasePrice(selectedSymbol.value)
-
-  const initialData = []
-  for (let i = 0; i < 20; i++) {
-    const time = timestamp - (20 - i) * 60 * 1000
-    const open = basePrice + Math.random() * 5 - 2.5
-    const close = basePrice + Math.random() * 5 - 2.5
-    const high = Math.max(open, close) + Math.random() * 2
-    const low = Math.min(open, close) - Math.random() * 2
-
-    initialData.push({
-      timestamp: time,
-      open,
-      high,
-      low,
-      close,
-      volume: 10000 + Math.random() * 5000,
-      turnover: (10000 + Math.random() * 5000) * close,
-    })
-  }
+    { // 6/3 带长上影
+      open: 31.10,
+      high: 31.45,
+      low: 30.95,
+      close: 31.05, // 冲高回落
+      volume: 1892000,
+      timestamp: 1717365600000
+    },
+    { // 6/4 缩量整理
+      open: 31.05,
+      high: 31.15,
+      low: 30.75,
+      close: 30.90, // 小跌0.48%
+      volume: 1423000,
+      timestamp: 1717452000000
+    },
+    { // 6/5 放量突破
+      open: 30.95,
+      high: 31.60,
+      low: 30.90,
+      close: 31.55, // 大涨2.10%
+      volume: 2817000,
+      timestamp: 1717538400000
+    },
+    { // 6/6 延续涨势
+      open: 31.55,
+      high: 32.00,
+      low: 31.40,
+      close: 31.95, // 收涨1.27%
+      volume: 2456000,
+      timestamp: 1717624800000
+    },
+    { // 6/7 高位震荡
+      open: 31.95,
+      high: 32.15,
+      low: 31.60,
+      close: 31.75, // 跌0.63%
+      volume: 1932000,
+      timestamp: 1717711200000
+    },
+    { // 6/8 十字星变盘信号
+      open: 31.75,
+      high: 31.95,
+      low: 31.55,
+      close: 31.75, // 平盘
+      volume: 1685000,
+      timestamp: 1717797600000
+    },
+    { // 6/9 技术回调
+      open: 31.75,
+      high: 31.80,
+      low: 31.15,    // 下探支撑位
+      close: 31.30, // 跌1.42%
+      volume: 2163000,
+      timestamp: 1717884000000
+    },
+    { // 6/10 企稳反弹
+      open: 31.30,
+      high: 31.65,
+      low: 31.20,
+      close: 31.55, // 涨0.80%
+      volume: 1754000,
+      timestamp: 1717970400000
+    }
+  ];
 
   // 设置初始数据
   chart.value.applyNewData(initialData)
@@ -356,38 +874,6 @@ function initChart() {
   if (indicator.value) {
     addIndicator(indicator.value)
   }
-}
-
-// 根据股票代码获取基础价格
-function getBasePrice(symbol) {
-  const priceMap = {
-    AAPL: 185,
-    MSFT: 420,
-    GOOGL: 170,
-    AMZN: 180,
-    TSLA: 250,
-    META: 500,
-    NVDA: 120,
-    NFLX: 630,
-    PYPL: 65,
-    INTC: 35,
-    AMD: 160,
-    BABA: 85,
-    BIDU: 105,
-    JD: 28,
-    PDD: 140,
-    NIO: 5,
-    XPEV: 8,
-    LI: 35,
-    JPM: 195,
-    V: 275,
-    MA: 450,
-    DIS: 90,
-    KO: 60,
-    PEP: 170,
-  }
-
-  return priceMap[symbol] || 100 // 默认价格为100
 }
 
 // 添加技术指标
@@ -406,10 +892,10 @@ function addIndicator(type) {
   // 添加新指标
   switch (type) {
     case 'macd':
-      chart.value.createIndicator('MACD', false, { id: 'macd_pane' })
+      chart.value.createIndicator('MACD', false, {id: 'macd_pane'})
       break
     case 'rsi':
-      chart.value.createIndicator('RSI', false, { id: 'rsi_pane' })
+      chart.value.createIndicator('RSI', false, {id: 'rsi_pane'})
       break
     case 'boll':
       chart.value.createIndicator('BOLL', true)
@@ -437,11 +923,9 @@ onMounted(async () => {
     selectedSymbol.value = codeParam
   }
 
-  // 初始化图表
   initChart()
-
   // 创建WebSocket连接
-  createWebSocketConnection()
+  // createWebSocketConnection()
 })
 
 onUnmounted(() => {
@@ -469,14 +953,6 @@ onUnmounted(() => {
 
 <template>
   <div class="min-h-screen flex flex-col">
-    <!-- 连接状态指示器 -->
-    <div class="mx-auto flex items-center justify-end px-4 py-2 container">
-      <span class="mr-2 text-gray-600">WebSocket状态:</span>
-      <el-tag :type="isConnected ? 'success' : 'danger'" size="small">
-        {{ isConnected ? '已连接' : '未连接' }}
-      </el-tag>
-    </div>
-
     <div class="flex-grow p-4">
       <!-- 搜索股票 -->
       <div class="stock-search-container mb-4">
@@ -493,17 +969,19 @@ onUnmounted(() => {
             <div class="mt-3 flex items-center md:ml-4 md:mt-0">
               <span class="mr-2 font-medium">搜索股票:</span>
               <el-autocomplete
-                v-model="searchInput"
-                :fetch-suggestions="querySearch"
-                placeholder="输入股票代码、名称、行业或市场"
-                style="width: 300px"
-                :trigger-on-focus="true"
-                clearable
-                :disabled="isLoadingStocks"
-                @select="handleSelect"
+                  v-model="searchInput"
+                  :fetch-suggestions="querySearch"
+                  placeholder="输入股票代码"
+                  style="width: 300px"
+                  :trigger-on-focus="true"
+                  clearable
+                  :disabled="isLoadingStocks"
+                  @select="handleSelect"
               >
                 <template #prefix>
-                  <el-icon><Search /></el-icon>
+                  <el-icon>
+                    <Search/>
+                  </el-icon>
                 </template>
                 <template #default="{ item }">
                   <div class="flex flex-col">
@@ -526,7 +1004,11 @@ onUnmounted(() => {
 
       <!-- K线图容器 -->
       <div class="chart-wrapper mb-4">
-        <div id="chart-container" />
+        <div id="chart-container">
+          <div v-if="!chart" class="loading-chart">
+            正在初始化图表...
+          </div>
+        </div>
       </div>
 
       <el-row :gutter="20" class="mt-4">
@@ -538,9 +1020,12 @@ onUnmounted(() => {
               </div>
             </template>
             <el-table :data="realtimeData" height="200">
-              <el-table-column prop="time" label="时间" />
-              <el-table-column prop="price" label="价格" />
-              <el-table-column prop="volume" label="成交量" />
+              <el-table-column prop="time" label="时间"/>
+              <el-table-column prop="amount" label="成交量"/>
+              <el-table-column prop="price" label="当前价格"/>
+              <el-table-column prop="lastPrice" label="昨日收盘价格"/>
+              <el-table-column prop="high" label="当天最高价"/>
+              <el-table-column prop="low" label="当天最低价"/>
             </el-table>
           </el-card>
         </el-col>
