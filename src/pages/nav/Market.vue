@@ -598,6 +598,121 @@ const currentStockInfo = computed(() => {
 let reconnectAttempts = 0
 let reconnectTimer = null
 
+// 用于存储K线数据的响应式引用
+const initialData = ref([
+  { open: 30.50, high: 30.80, low: 30.20, close: 30.60, volume: 1584000, timestamp: 1717192800000 },
+  { open: 30.60, high: 31.20, low: 30.50, close: 31.10, volume: 2245000, timestamp: 1717279200000 },
+  { open: 31.10, high: 31.45, low: 30.95, close: 31.05, volume: 1892000, timestamp: 1717365600000 },
+  { open: 31.05, high: 31.15, low: 30.75, close: 30.90, volume: 1423000, timestamp: 1717452000000 },
+  { open: 30.95, high: 31.60, low: 30.90, close: 31.55, volume: 2817000, timestamp: 1717538400000 },
+  { open: 31.55, high: 32.00, low: 31.40, close: 31.95, volume: 2456000, timestamp: 1717624800000 },
+  { open: 31.95, high: 32.15, low: 31.60, close: 31.75, volume: 1932000, timestamp: 1717711200000 },
+  { open: 31.75, high: 31.95, low: 31.55, close: 31.75, volume: 1685000, timestamp: 1717797600000 },
+  { open: 31.75, high: 31.80, low: 31.15, close: 31.30, volume: 2163000, timestamp: 1717884000000 },
+  { open: 31.30, high: 31.65, low: 31.20, close: 31.55, volume: 1754000, timestamp: 1717970400000 },
+  { open: 31.55, high: 32.20, low: 31.50, close: 32.15, volume: 3521000, timestamp: 1718056800000 },
+  { open: 32.15, high: 32.95, low: 32.10, close: 32.80, volume: 4218000, timestamp: 1718143200000 },
+  { open: 32.80, high: 33.10, low: 32.45, close: 32.50, volume: 3852000, timestamp: 1718229600000 },
+  { open: 32.50, high: 32.70, low: 31.90, close: 32.00, volume: 2845000, timestamp: 1718316000000 },
+  { open: 32.00, high: 32.65, low: 31.95, close: 32.30, volume: 2162000, timestamp: 1718402400000 },
+  { open: 32.30, high: 32.60, low: 31.85, close: 31.90, volume: 2981000, timestamp: 1718488800000 },
+  { open: 31.90, high: 32.00, low: 31.20, close: 31.35, volume: 3725000, timestamp: 1718575200000 },
+  { open: 31.35, high: 31.80, low: 31.10, close: 31.65, volume: 2564000, timestamp: 1718661600000 },
+  { open: 31.65, high: 31.90, low: 31.50, close: 31.75, volume: 2300000, timestamp: 1718748000000 }, // 19日 反弹受阻
+  { open: 31.75, high: 31.80, low: 31.20, close: 31.30, volume: 2800000, timestamp: 1718834400000 }, // 20日 二次探底
+  { open: 31.30, high: 31.50, low: 31.10, close: 31.45, volume: 2200000, timestamp: 1718920800000 }, // 21日 锤头线止跌
+  { open: 31.45, high: 31.60, low: 31.30, close: 31.45, volume: 1500000, timestamp: 1719007200000 }, // 22日 缩量盘整
+  { open: 31.45, high: 32.00, low: 31.40, close: 31.90, volume: 3500000, timestamp: 1719093600000 }, // 23日 放量突破
+  { open: 31.90, high: 32.30, low: 31.85, close: 32.25, volume: 3000000, timestamp: 1719180000000 }, // 24日 量价齐升
+  { open: 32.25, high: 32.40, low: 32.00, close: 32.05, volume: 2500000, timestamp: 1719266400000 }, // 25日 抛压显现
+  { open: 32.05, high: 32.10, low: 31.95, close: 32.00, volume: 1800000, timestamp: 1719352800000 }, // 26日 十字星变盘
+  { open: 32.00, high: 32.50, low: 31.98, close: 32.45, volume: 4000000, timestamp: 1719439200000 }, // 27日 利好
+])
+const klineLoading = ref(false)
+
+async function fetchDayKLine(stockCode) {
+  // 空值保护
+  if (!stockCode) {
+    console.error('股票代码不能为空')
+    return []
+  }
+
+  try {
+    klineLoading.value = true
+
+    const response = await axios.get(
+      `http://localhost:5000/daykline/${encodeURIComponent(stockCode)}`,
+    )
+
+    // 核心数据提取与校验
+    const rawData = response.data.data?.[stockCode] || []
+
+    // 数据处理流水线
+    const processedData = rawData.map((item) => {
+      // 防御性解构（索引位置需与Python接口对齐）
+      const [dateStr, open, close, high, low, volume] = item
+
+      // 时间戳转换（带时区安全处理）
+      const parseDate = (dateStr) => {
+        // 处理沪深港三种不同日期格式
+        const datePatterns = [
+          'yyyy-MM-dd', // 常规格式
+        ]
+
+        let timestamp = Date.parse(dateStr)
+        // 尝试多种格式解析
+        if (Number.isNaN(timestamp)) {
+          for (const pattern of datePatterns) {
+            const fmtDate = window.dayjs(dateStr, pattern)
+            if (fmtDate.isValid()) {
+              timestamp = fmtDate.valueOf()
+              break
+            }
+          }
+        }
+        return timestamp || Date.now()
+      }
+
+      // 安全数值转换逻辑
+      const safeParse = (value) => {
+        const num = Number(value)
+        return Number.isFinite(num) ? num : 0
+      }
+
+      return {
+        open: safeParse(open),
+        high: safeParse(high),
+        low: safeParse(low),
+        close: safeParse(close),
+        volume: safeParse(volume),
+        timestamp: parseDate(dateStr),
+      }
+    }).filter(Boolean) // 过滤无效数据
+
+    // 按时间升序排列
+    processedData.sort((a, b) => a.timestamp - b.timestamp)
+
+    initialData.value = processedData
+    return processedData
+  }
+  catch (err) {
+    console.error('[K线数据获取失败]', err)
+
+    // 异常处理分级
+    const errorMessage = err.response
+      ? `服务器错误 (${err.response.status})`
+      : err.message.includes('Network')
+        ? '网络连接异常'
+        : '数据解析失败'
+
+    ElMessage.error(`K线数据加载失败：${errorMessage}`)
+    return []
+  }
+  finally {
+    klineLoading.value = false
+  }
+}
+
 // 创建WebSocket连接
 function createWebSocketConnection() {
   try {
@@ -778,35 +893,7 @@ function initChart() {
   // 设置图表样式
   chart.value.setStyles(styles)
 
-  const initialData = [
-    { open: 30.50, high: 30.80, low: 30.20, close: 30.60, volume: 1584000, timestamp: 1717192800000 },
-    { open: 30.60, high: 31.20, low: 30.50, close: 31.10, volume: 2245000, timestamp: 1717279200000 },
-    { open: 31.10, high: 31.45, low: 30.95, close: 31.05, volume: 1892000, timestamp: 1717365600000 },
-    { open: 31.05, high: 31.15, low: 30.75, close: 30.90, volume: 1423000, timestamp: 1717452000000 },
-    { open: 30.95, high: 31.60, low: 30.90, close: 31.55, volume: 2817000, timestamp: 1717538400000 },
-    { open: 31.55, high: 32.00, low: 31.40, close: 31.95, volume: 2456000, timestamp: 1717624800000 },
-    { open: 31.95, high: 32.15, low: 31.60, close: 31.75, volume: 1932000, timestamp: 1717711200000 },
-    { open: 31.75, high: 31.95, low: 31.55, close: 31.75, volume: 1685000, timestamp: 1717797600000 },
-    { open: 31.75, high: 31.80, low: 31.15, close: 31.30, volume: 2163000, timestamp: 1717884000000 },
-    { open: 31.30, high: 31.65, low: 31.20, close: 31.55, volume: 1754000, timestamp: 1717970400000 },
-    { open: 31.55, high: 32.20, low: 31.50, close: 32.15, volume: 3521000, timestamp: 1718056800000 },
-    { open: 32.15, high: 32.95, low: 32.10, close: 32.80, volume: 4218000, timestamp: 1718143200000 },
-    { open: 32.80, high: 33.10, low: 32.45, close: 32.50, volume: 3852000, timestamp: 1718229600000 },
-    { open: 32.50, high: 32.70, low: 31.90, close: 32.00, volume: 2845000, timestamp: 1718316000000 },
-    { open: 32.00, high: 32.65, low: 31.95, close: 32.30, volume: 2162000, timestamp: 1718402400000 },
-    { open: 32.30, high: 32.60, low: 31.85, close: 31.90, volume: 2981000, timestamp: 1718488800000 },
-    { open: 31.90, high: 32.00, low: 31.20, close: 31.35, volume: 3725000, timestamp: 1718575200000 },
-    { open: 31.35, high: 31.80, low: 31.10, close: 31.65, volume: 2564000, timestamp: 1718661600000 },
-    { open: 31.65, high: 31.90, low: 31.50, close: 31.75, volume: 2300000, timestamp: 1718748000000 }, // 19日 反弹受阻
-    { open: 31.75, high: 31.80, low: 31.20, close: 31.30, volume: 2800000, timestamp: 1718834400000 }, // 20日 二次探底
-    { open: 31.30, high: 31.50, low: 31.10, close: 31.45, volume: 2200000, timestamp: 1718920800000 }, // 21日 锤头线止跌
-    { open: 31.45, high: 31.60, low: 31.30, close: 31.45, volume: 1500000, timestamp: 1719007200000 }, // 22日 缩量盘整
-    { open: 31.45, high: 32.00, low: 31.40, close: 31.90, volume: 3500000, timestamp: 1719093600000 }, // 23日 放量突破
-    { open: 31.90, high: 32.30, low: 31.85, close: 32.25, volume: 3000000, timestamp: 1719180000000 }, // 24日 量价齐升
-    { open: 32.25, high: 32.40, low: 32.00, close: 32.05, volume: 2500000, timestamp: 1719266400000 }, // 25日 抛压显现
-    { open: 32.05, high: 32.10, low: 31.95, close: 32.00, volume: 1800000, timestamp: 1719352800000 }, // 26日 十字星变盘
-    { open: 32.00, high: 32.50, low: 31.98, close: 32.45, volume: 4000000, timestamp: 1719439200000 }, // 27日 利好
-  ]
+  const initialData = []
 
   // 设置初始数据
   chart.value.applyNewData(initialData)
@@ -947,7 +1034,7 @@ onUnmounted(() => {
       <div class="chart-wrapper mb-4">
         <div class="chart-title text-xl font-bold">
           日k线图
-          <span class="text-sm text-gray-500 ml-2">{{ currentStockCode }}</span>
+          <span class="ml-2 text-sm text-gray-500">{{ currentStockCode }}</span>
         </div>
 
         <div id="chart-container">
