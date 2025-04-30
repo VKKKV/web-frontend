@@ -2,7 +2,7 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { dispose, init } from 'klinecharts'
-import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
+import { onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
@@ -491,6 +491,52 @@ const styles = {
   },
 }
 
+const currentStockName = ref('长和')
+const currentStockCode = ref('00001')
+
+let reconnectAttempts = 0
+let reconnectTimer = null
+
+// 用于存储K线数据的响应式引用
+const initialData = ref([
+  { open: 30.50, high: 30.80, low: 30.20, close: 30.60, volume: 1584000, timestamp: 1717192800000 },
+  { open: 30.60, high: 31.20, low: 30.50, close: 31.10, volume: 2245000, timestamp: 1717279200000 },
+  { open: 31.10, high: 31.45, low: 30.95, close: 31.05, volume: 1892000, timestamp: 1717365600000 },
+  { open: 31.05, high: 31.15, low: 30.75, close: 30.90, volume: 1423000, timestamp: 1717452000000 },
+  { open: 30.95, high: 31.60, low: 30.90, close: 31.55, volume: 2817000, timestamp: 1717538400000 },
+  { open: 31.55, high: 32.00, low: 31.40, close: 31.95, volume: 2456000, timestamp: 1717624800000 },
+  { open: 31.95, high: 32.15, low: 31.60, close: 31.75, volume: 1932000, timestamp: 1717711200000 },
+  { open: 31.75, high: 31.95, low: 31.55, close: 31.75, volume: 1685000, timestamp: 1717797600000 },
+  { open: 31.75, high: 31.80, low: 31.15, close: 31.30, volume: 2163000, timestamp: 1717884000000 },
+  { open: 31.30, high: 31.65, low: 31.20, close: 31.55, volume: 1754000, timestamp: 1717970400000 },
+  { open: 31.55, high: 32.20, low: 31.50, close: 32.15, volume: 3521000, timestamp: 1718056800000 },
+  { open: 32.15, high: 32.95, low: 32.10, close: 32.80, volume: 4218000, timestamp: 1718143200000 },
+  { open: 32.80, high: 33.10, low: 32.45, close: 32.50, volume: 3852000, timestamp: 1718229600000 },
+  { open: 32.50, high: 32.70, low: 31.90, close: 32.00, volume: 2845000, timestamp: 1718316000000 },
+  { open: 32.00, high: 32.65, low: 31.95, close: 32.30, volume: 2162000, timestamp: 1718402400000 },
+  { open: 32.30, high: 32.60, low: 31.85, close: 31.90, volume: 2981000, timestamp: 1718488800000 },
+  { open: 31.90, high: 32.00, low: 31.20, close: 31.35, volume: 3725000, timestamp: 1718575200000 },
+  { open: 31.35, high: 31.80, low: 31.10, close: 31.65, volume: 2564000, timestamp: 1718661600000 },
+  { open: 31.65, high: 31.90, low: 31.50, close: 31.75, volume: 2300000, timestamp: 1718748000000 }, // 19日 反弹受阻
+  { open: 31.75, high: 31.80, low: 31.20, close: 31.30, volume: 2800000, timestamp: 1718834400000 }, // 20日 二次探底
+  { open: 31.30, high: 31.50, low: 31.10, close: 31.45, volume: 2200000, timestamp: 1718920800000 }, // 21日 锤头线止跌
+  { open: 31.45, high: 31.60, low: 31.30, close: 31.45, volume: 1500000, timestamp: 1719007200000 }, // 22日 缩量盘整
+  { open: 31.45, high: 32.00, low: 31.40, close: 31.90, volume: 3500000, timestamp: 1719093600000 }, // 23日 放量突破
+  { open: 31.90, high: 32.30, low: 31.85, close: 32.25, volume: 3000000, timestamp: 1719180000000 }, // 24日 量价齐升
+  { open: 32.25, high: 32.40, low: 32.00, close: 32.05, volume: 2500000, timestamp: 1719266400000 }, // 25日 抛压显现
+  { open: 32.05, high: 32.10, low: 31.95, close: 32.00, volume: 1800000, timestamp: 1719352800000 }, // 26日 十字星变盘
+  { open: 32.00, high: 32.50, low: 31.98, close: 32.45, volume: 4000000, timestamp: 1719439200000 }, // 27日 利好
+])
+const klineLoading = ref(false)
+// 新增防抖函数
+function debounce(fn, delay) {
+  let timer
+  return (...args) => {
+    clearTimeout(timer)
+    timer = setTimeout(() => fn.apply(this, args), delay)
+  }
+}
+
 const realtimeData = ref([{
   lotSize: 100.0,
   name: '长和',
@@ -505,47 +551,49 @@ const realtimeData = ref([{
 },
 ])
 
-// 从后端获取股票列表
-async function fetchStockList() {
-  isLoadingStocks.value = true
+// 修改后的输入处理逻辑
+const handleCodeInput = debounce(async (value) => {
+  if (!value) {
+    currentStockCode.value = ''
+    currentStockName.value = '未选择股票'
+    initialData.value = []
+    return
+  }
   try {
-    // const loadingInstance = ElLoading.service({
-    //   target: '.stock-search-container',
-    //   text: '加载股票列表...',
-    // })
+    isLoadingStocks.value = true
 
-    // 从后端API获取股票列表
-    const response = await axios.get('/api/v1/market/stocks')
+    // 这里可以添加股票代码格式校验
+    if (!/^\d{5}$/.test(value)) {
+      ElMessage.warning('请输入5位数字股票代码')
+      return
+    }
+    // 新修改点：直接使用输入值
+    currentStockCode.value = value.toUpperCase()
 
-    // 处理响应数据
-    if (response.data && Array.isArray(response.data.stocks)) {
-      stockOptions.value = response.data.stocks
+    // 并行获取数据
+    await Promise.all([
+      // fetchStockDetails(value),
+      fetchDayKLine(value),
+    ])
+    // 更新图表
+    if (chart.value) {
+      // chart.value.updateOptions({
+      //   title: { text: `${currentStockName.value} (${value})` },
+      // })
+      console.log(initialData)
+      chart.value.applyNewData(initialData)
     }
     else {
-      // 如果API返回格式不符合预期，使用默认数据
-      console.warn('后端返回的股票数据格式不符合预期，使用默认数据')
-      stockOptions.value = getDefaultStocks()
+      initChart()
     }
-
-    // loadingInstance.close()
   }
-  catch (error) {
-    console.error('获取股票列表失败:', error)
-    ElMessage.error('获取股票列表失败，使用默认数据')
-    // 加载失败时使用默认数据
-    stockOptions.value = getDefaultStocks()
+  catch (err) {
+    ElMessage.error(`加载失败: ${err.message}`)
   }
   finally {
     isLoadingStocks.value = false
   }
-}
-
-// 默认股票数据（当API请求失败时使用）
-function getDefaultStocks() {
-  return [
-    { value: '00001', label: '长和', market: '港股' },
-  ]
-}
+}, 500) // 500毫秒防抖
 
 // 搜索过滤
 function filterStocks(queryString) {
@@ -584,51 +632,6 @@ function querySearch(queryString, cb) {
 }
 
 // 获取当前股票名称
-const currentStockName = computed(() => {
-  const stock = stockOptions.value.find(s => s.value === selectedSymbol.value)
-  return stock ? stock.label : selectedSymbol.value
-})
-
-// 获取当前股票信息
-const currentStockInfo = computed(() => {
-  const stock = stockOptions.value.find(s => s.value === selectedSymbol.value)
-  return stock && stock.market ? `${stock.market} | ${stock.value}` : ''
-})
-
-let reconnectAttempts = 0
-let reconnectTimer = null
-
-// 用于存储K线数据的响应式引用
-const initialData = ref([
-  { open: 30.50, high: 30.80, low: 30.20, close: 30.60, volume: 1584000, timestamp: 1717192800000 },
-  { open: 30.60, high: 31.20, low: 30.50, close: 31.10, volume: 2245000, timestamp: 1717279200000 },
-  { open: 31.10, high: 31.45, low: 30.95, close: 31.05, volume: 1892000, timestamp: 1717365600000 },
-  { open: 31.05, high: 31.15, low: 30.75, close: 30.90, volume: 1423000, timestamp: 1717452000000 },
-  { open: 30.95, high: 31.60, low: 30.90, close: 31.55, volume: 2817000, timestamp: 1717538400000 },
-  { open: 31.55, high: 32.00, low: 31.40, close: 31.95, volume: 2456000, timestamp: 1717624800000 },
-  { open: 31.95, high: 32.15, low: 31.60, close: 31.75, volume: 1932000, timestamp: 1717711200000 },
-  { open: 31.75, high: 31.95, low: 31.55, close: 31.75, volume: 1685000, timestamp: 1717797600000 },
-  { open: 31.75, high: 31.80, low: 31.15, close: 31.30, volume: 2163000, timestamp: 1717884000000 },
-  { open: 31.30, high: 31.65, low: 31.20, close: 31.55, volume: 1754000, timestamp: 1717970400000 },
-  { open: 31.55, high: 32.20, low: 31.50, close: 32.15, volume: 3521000, timestamp: 1718056800000 },
-  { open: 32.15, high: 32.95, low: 32.10, close: 32.80, volume: 4218000, timestamp: 1718143200000 },
-  { open: 32.80, high: 33.10, low: 32.45, close: 32.50, volume: 3852000, timestamp: 1718229600000 },
-  { open: 32.50, high: 32.70, low: 31.90, close: 32.00, volume: 2845000, timestamp: 1718316000000 },
-  { open: 32.00, high: 32.65, low: 31.95, close: 32.30, volume: 2162000, timestamp: 1718402400000 },
-  { open: 32.30, high: 32.60, low: 31.85, close: 31.90, volume: 2981000, timestamp: 1718488800000 },
-  { open: 31.90, high: 32.00, low: 31.20, close: 31.35, volume: 3725000, timestamp: 1718575200000 },
-  { open: 31.35, high: 31.80, low: 31.10, close: 31.65, volume: 2564000, timestamp: 1718661600000 },
-  { open: 31.65, high: 31.90, low: 31.50, close: 31.75, volume: 2300000, timestamp: 1718748000000 }, // 19日 反弹受阻
-  { open: 31.75, high: 31.80, low: 31.20, close: 31.30, volume: 2800000, timestamp: 1718834400000 }, // 20日 二次探底
-  { open: 31.30, high: 31.50, low: 31.10, close: 31.45, volume: 2200000, timestamp: 1718920800000 }, // 21日 锤头线止跌
-  { open: 31.45, high: 31.60, low: 31.30, close: 31.45, volume: 1500000, timestamp: 1719007200000 }, // 22日 缩量盘整
-  { open: 31.45, high: 32.00, low: 31.40, close: 31.90, volume: 3500000, timestamp: 1719093600000 }, // 23日 放量突破
-  { open: 31.90, high: 32.30, low: 31.85, close: 32.25, volume: 3000000, timestamp: 1719180000000 }, // 24日 量价齐升
-  { open: 32.25, high: 32.40, low: 32.00, close: 32.05, volume: 2500000, timestamp: 1719266400000 }, // 25日 抛压显现
-  { open: 32.05, high: 32.10, low: 31.95, close: 32.00, volume: 1800000, timestamp: 1719352800000 }, // 26日 十字星变盘
-  { open: 32.00, high: 32.50, low: 31.98, close: 32.45, volume: 4000000, timestamp: 1719439200000 }, // 27日 利好
-])
-const klineLoading = ref(false)
 
 async function fetchDayKLine(stockCode) {
   // 空值保护
@@ -942,9 +945,6 @@ watch(indicator, (newValue) => {
 
 // 从URL参数获取股票代码
 onMounted(async () => {
-  // 获取股票列表
-  await fetchStockList()
-
   // 检查URL参数
   const codeParam = route.query.code
   if (codeParam && typeof codeParam === 'string') {
@@ -982,49 +982,34 @@ onUnmounted(() => {
 <template>
   <div class="list-container">
     <div class="flex-grow p-4">
-      <!-- 搜索股票 -->
+      <!-- 股票搜索模块 -->
       <div class="stock-search-container mb-4">
         <el-card v-loading="isLoadingStocks">
           <div class="flex flex-col md:flex-row md:items-center">
             <div class="flex-1">
               <div class="mb-2 text-xl font-bold">
-                {{ currentStockName }}
+                {{ currentStockName || '未选择股票' }}
               </div>
               <div class="text-gray-500">
-                {{ currentStockInfo }}
+                <!--                {{ currentStockInfo }} -->
+                {{ currentStockCode ? `${currentStockCode} 即时行情` : '输入股票代码查看详情' }}
               </div>
             </div>
             <div class="mt-3 flex items-center md:ml-4 md:mt-0">
-              <span class="mr-2 font-medium">搜索股票:</span>
-              <el-autocomplete
+              <span class="mr-2 font-medium">股票代码:</span>
+              <el-input
                 v-model="searchInput"
-                :fetch-suggestions="querySearch"
-                placeholder="输入股票代码"
+                placeholder="输入股票代码 (如: 00001)"
                 style="width: 300px"
                 :trigger-on-focus="true"
                 clearable
                 :disabled="isLoadingStocks"
-                @select="handleSelect"
+                @input="handleCodeInput"
               >
                 <template #prefix>
-                  <el-icon>
-                    <Search />
-                  </el-icon>
+                  <el-icon><Search /></el-icon>
                 </template>
-                <template #default="{ item }">
-                  <div class="flex flex-col">
-                    <div class="flex items-center justify-between">
-                      <span class="font-medium">{{ item.label }}</span>
-                      <el-tag size="small" type="info">
-                        {{ item.value }}
-                      </el-tag>
-                    </div>
-                    <div v-if="item.market" class="mt-1 text-xs text-gray-500">
-                      {{ item.market }} | {{ item.value }}
-                    </div>
-                  </div>
-                </template>
-              </el-autocomplete>
+              </el-input>
             </div>
           </div>
         </el-card>
@@ -1033,13 +1018,18 @@ onUnmounted(() => {
       <!-- K线图容器 -->
       <div class="chart-wrapper mb-4">
         <div class="chart-title text-xl font-bold">
-          日k线图
-          <span class="ml-2 text-sm text-gray-500">{{ currentStockCode }}</span>
+          日K线图
+          <span v-if="currentStockCode" class="ml-2 text-sm text-gray-500">
+            {{ currentStockCode }} | {{ currentStockName }}
+          </span>
         </div>
-
         <div id="chart-container">
-          <div v-if="!chart" class="loading-chart">
-            正在初始化图表...
+          <!-- 根据输入状态显示不同提示 -->
+          <div v-if="!currentStockCode" class="chart-prompt">
+            请输入股票代码加载图表
+          </div>
+          <div v-else-if="!chart" class="loading-chart">
+            正在加载{{ currentStockCode }}的K线数据...
           </div>
         </div>
       </div>
