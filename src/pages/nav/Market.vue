@@ -498,7 +498,7 @@ let reconnectAttempts = 0
 let reconnectTimer = null
 
 // 用于存储K线数据的响应式引用
-const initialData = ref([
+let initialData = [
   { open: 30.50, high: 30.80, low: 30.20, close: 30.60, volume: 1584000, timestamp: 1717192800000 },
   { open: 30.60, high: 31.20, low: 30.50, close: 31.10, volume: 2245000, timestamp: 1717279200000 },
   { open: 31.10, high: 31.45, low: 30.95, close: 31.05, volume: 1892000, timestamp: 1717365600000 },
@@ -526,7 +526,7 @@ const initialData = ref([
   { open: 32.25, high: 32.40, low: 32.00, close: 32.05, volume: 2500000, timestamp: 1719266400000 }, // 25日 抛压显现
   { open: 32.05, high: 32.10, low: 31.95, close: 32.00, volume: 1800000, timestamp: 1719352800000 }, // 26日 十字星变盘
   { open: 32.00, high: 32.50, low: 31.98, close: 32.45, volume: 4000000, timestamp: 1719439200000 }, // 27日 利好
-])
+]
 const klineLoading = ref(false)
 // 新增防抖函数
 function debounce(fn, delay) {
@@ -695,7 +695,7 @@ async function fetchDayKLine(stockCode) {
     // 按时间升序排列
     processedData.sort((a, b) => a.timestamp - b.timestamp)
 
-    initialData.value = processedData
+    initialData = processedData
     return processedData
   }
   catch (err) {
