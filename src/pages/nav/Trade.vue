@@ -8,7 +8,7 @@ import { useAuth } from '~/composables/useAuth.js'
 const { userId } = useAuth()
 
 const loading = ref(false)
-const stockList = ref([])
+// const stockList = ref([])
 const tradeHistory = ref([])
 
 // 安全类型转换
@@ -38,15 +38,56 @@ const userHoldings = ref([
   },
 ])
 
-// 计算持仓市值
+// 计算持仓市值和盈亏
 const holdingValues = computed(() => {
-  return userHoldings.value.map(holding => ({
-    ...holding,
-    marketValue: holding.currentPrice * holding.quantity,
-    profitRatio: holding.avgPrice > 0
-      ? ((holding.currentPrice - holding.avgPrice) / holding.avgPrice) * 100
-      : 0,
-  }))
+  return userHoldings.value.map((holding) => {
+    // 安全转换数值类型
+    const currentPrice = Number(holding.currentPrice) || 0
+    const avgPrice = Number(holding.avgPrice) || 0
+    const quantity = Number(holding.quantity) || 0
+
+    // 计算浮动盈亏
+    const profit = (currentPrice - avgPrice) * quantity
+
+    // 计算盈亏比例（防止除零）
+    const profitRatio = avgPrice > 0
+      ? ((currentPrice - avgPrice) / avgPrice) * 100
+      : 0
+
+    return {
+      ...holding,
+      currentPrice, // 确保是数字类型
+      avgPrice, // 确保是数字类型
+      marketValue: currentPrice * quantity,
+      profit,
+      profitRatio,
+    }
+  })
+})
+
+// 计算总市值（确保数值安全）
+const totalMarketValue = computed(() => {
+  return holdingValues.value.reduce((total, holding) => {
+    return total + (Number(holding.currentPrice) * Number(holding.quantity))
+  }, 0)
+})
+
+// 计算总盈亏（确保数值安全）
+const totalProfit = computed(() => {
+  return holdingValues.value.reduce((total, holding) => {
+    return total + (Number(holding.profit) || 0)
+  }, 0)
+})
+
+// 计算总收益率（新增）
+const totalProfitRatio = computed(() => {
+  const totalCost = holdingValues.value.reduce((total, holding) => {
+    return total + (Number(holding.avgPrice) * Number(holding.quantity))
+  }, 0)
+
+  return totalCost > 0
+    ? (totalProfit.value / totalCost) * 100
+    : 0
 })
 
 // TODO
@@ -254,7 +295,6 @@ async function updateHoldingsPrice() {
           s => s.stockCode === holding.symbol,
         )
 
-
         const currentPrice = safeParseFloat(realtimeData?.price) || holding.currentPrice
         return {
           ...holding,
@@ -327,7 +367,6 @@ onMounted(() => {
             placeholder="输入港股代码"
             @change="handleSymbolChange"
           />
-
           <!--          <el-select -->
           <!--            v-model="form.symbol" -->
           <!--            filterable -->
@@ -341,7 +380,7 @@ onMounted(() => {
           <!--              :label="item.label" -->
           <!--              :value="item.value" -->
           <!--            /> -->
-          <!--          </el-select>-->
+          <!--          </el-select> -->
         </el-form-item>
 
         <el-form-item label="买卖方向">
@@ -434,8 +473,27 @@ onMounted(() => {
     <div class="data-container">
       <el-card class="data-panel holding-panel">
         <template #header>
-          <div class="text-xl font-bold">
-            股票持仓
+          <div class="flex items-center justify-between">
+            <div class="text-xl font-bold">
+              股票持仓
+            </div>
+            <div class="flex gap-4 text-sm">
+              <div>
+                总市值: <span class="font-mono">{{ totalMarketValue.toLocaleString(undefined, { maximumFractionDigits: 2 }) }}</span>
+              </div>
+              <div :class="{ 'text-green-500': totalProfit >= 0, 'text-red-500': totalProfit < 0 }">
+                浮动盈亏:
+                <span class="font-mono">
+                  {{ totalProfit >= 0 ? '+' : '' }}{{ totalProfit.toLocaleString(undefined, { maximumFractionDigits: 2 }) }}
+                </span>
+              </div>
+              <div :class="{ 'text-green-500': totalProfitRatio >= 0, 'text-red-500': totalProfitRatio < 0 }">
+                收益率:
+                <span class="font-mono">
+                  {{ totalProfitRatio >= 0 ? '+' : '' }}{{ totalProfitRatio.toFixed(2) }}%
+                </span>
+              </div>
+            </div>
           </div>
         </template>
         <el-table

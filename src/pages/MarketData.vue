@@ -40,7 +40,7 @@ async function fetchPaginatedStocks() {
 
     if (allStockCodes.value.length === 0) {
       const allStocksRes = await axios.get('http://localhost:8080/api/v1/market/getstock/all')
-      allStockCodes.value = allStocksRes.data.codes
+      allStockCodes.value = allStocksRes.data
       totalStocks.value = allStockCodes.value.length
     }
 
@@ -101,10 +101,6 @@ function loadFavorites() {
 }
 
 const favoriteStocks = ref(loadFavorites())
-// const favoriteStocks = ref([
-//   { stock_code: '00700', name: '腾讯控股', price: 320.0, isFavorite: true },
-//   { stock_code: '00001', name: '长和', price: 45.6, isFavorite: true },
-// ])
 
 // 获取自选股实时数据
 async function fetchFavoriteStocks() {
