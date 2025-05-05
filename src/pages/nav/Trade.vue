@@ -4,17 +4,10 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, ref } from 'vue'
 import { useAuth } from '~/composables/useAuth.js'
-
 const { userId } = useAuth()
-
 const loading = ref(false)
-// const stockList = ref([])
 const tradeHistory = ref([])
-
-// 安全类型转换
 const safeParseFloat = v => Number.isFinite(+v) ? +v : 0
-// const safeParseInt = v => Math.abs(Number.parseInt(v)) || 0
-
 const form = ref({
   symbol: '00001',
   side: 'BUY',
@@ -37,6 +30,7 @@ const userHoldings = ref([
     profit: -600, // 浮动盈亏
   },
 ])
+const stockName = ref()
 
 // 计算持仓市值和盈亏
 const holdingValues = computed(() => {
@@ -106,6 +100,42 @@ const totalProfitRatio = computed(() => {
 //     console.error('获取股票列表失败:', error)
 //   }
 // }
+
+async function fetchStockName(stockCode) {
+  // 新增参数验证环节
+  if (!stockCode || typeof stockCode !== 'string') {
+    console.error('股票代码参数不合法')
+    return ''
+  }
+
+  try {
+    const encodedCode = encodeURIComponent(stockCode)
+    const response = await axios.get(
+        `http://localhost:8080/api/v1/market/getstock/${encodedCode}`,
+    )
+
+    // 优化数据校验逻辑
+    const isValidResponse = Array.isArray(response?.data)
+        && response.data.length > 0
+        && response.data[0]?.stockCode === stockCode
+
+    if (!isValidResponse) {
+      console.warn('接口返回数据异常', response.data)
+      return ''
+    }
+    return sanitizeName(response.data[0].name) || ''
+  }
+  catch (err) {
+    // 分级错误处理
+    const errorType = err.code === 'ECONNABORTED'
+        ? '请求超时'
+        : err.response
+            ? `服务器错误 (${err.response.status})`
+            : '网络异常'
+    console.error(`股票名称查询失败(${errorType})`, err)
+    return ''
+  }
+}
 
 // 获取交易历史
 async function fetchTradeHistory() {
@@ -205,7 +235,7 @@ async function submitOrder() {
   }
 }
 
-// 获取股票实时价格
+// 获取股票实时价格&stockName
 async function handleSymbolChange(symbol) {
   if (!symbol)
     return
@@ -213,6 +243,7 @@ async function handleSymbolChange(symbol) {
     const response = await axios.get(`/api/v1/market/getstock/${symbol}`)
     if (response.status === 200) {
       form.value.price = safeParseFloat(response.data[0].price)
+      stockName.value = response.data[0].name
     }
   }
   catch (error) {
@@ -381,6 +412,10 @@ onMounted(() => {
           <!--              :value="item.value" -->
           <!--            /> -->
           <!--          </el-select> -->
+        </el-form-item>
+
+        <el-form-item label="股票名称">
+          <span>{{ stockName }}</span>
         </el-form-item>
 
         <el-form-item label="买卖方向">
