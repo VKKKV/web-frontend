@@ -84,59 +84,6 @@ const totalProfitRatio = computed(() => {
     : 0
 })
 
-// TODO
-// 获取可交易股票列表
-// async function fetchStockList() {
-//   try {
-//     const response = await axios.get('/api/v1/market/stocks')
-//     if (response.data.code === 200) {
-//       stockList.value = response.data.data.map(stock => ({
-//         value: stock.stockCode,
-//         label: `${stock.stockName} (${stock.stockCode})`,
-//       }))
-//     }
-//   }
-//   catch (error) {
-//     console.error('获取股票列表失败:', error)
-//   }
-// }
-
-async function fetchStockName(stockCode) {
-  // 新增参数验证环节
-  if (!stockCode || typeof stockCode !== 'string') {
-    console.error('股票代码参数不合法')
-    return ''
-  }
-
-  try {
-    const encodedCode = encodeURIComponent(stockCode)
-    const response = await axios.get(
-        `http://localhost:8080/api/v1/market/getstock/${encodedCode}`,
-    )
-
-    // 优化数据校验逻辑
-    const isValidResponse = Array.isArray(response?.data)
-        && response.data.length > 0
-        && response.data[0]?.stockCode === stockCode
-
-    if (!isValidResponse) {
-      console.warn('接口返回数据异常', response.data)
-      return ''
-    }
-    return sanitizeName(response.data[0].name) || ''
-  }
-  catch (err) {
-    // 分级错误处理
-    const errorType = err.code === 'ECONNABORTED'
-        ? '请求超时'
-        : err.response
-            ? `服务器错误 (${err.response.status})`
-            : '网络异常'
-    console.error(`股票名称查询失败(${errorType})`, err)
-    return ''
-  }
-}
-
 // 获取交易历史
 async function fetchTradeHistory() {
   try {
