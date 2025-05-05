@@ -24,6 +24,7 @@
     "axios": "1.8.2",
     "buffer": "^6.0.3",
     "dayjs": "^1.11.13",
+    "echarts": "^5.6.0",
     "element-plus": "^2.9.0",
     "klinecharts": "10.0.0-alpha4",
     "lodash-es": "^4.17.21",
