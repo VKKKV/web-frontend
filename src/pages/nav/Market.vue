@@ -1,9 +1,22 @@
 <script setup>
 import axios from 'axios'
+import dayjsBase from 'dayjs'
+import isoWeek from 'dayjs/plugin/isoWeek'
+import isoWeekYear from 'dayjs/plugin/isoWeeksInYear'
+import timezone from 'dayjs/plugin/timezone'
+import utc from 'dayjs/plugin/utc'
+
 import { ElMessage } from 'element-plus'
 import { dispose, init } from 'klinecharts'
-import { onMounted, onUnmounted, ref, shallowRef } from 'vue'
+import { onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
+// 扩展插件（只需要执行一次）
+dayjsBase.extend(isoWeek)
+dayjsBase.extend(isoWeekYear)
+dayjsBase.extend(utc)
+dayjsBase.extend(timezone)
+// 创建带中国时区的dayjs实例
+const myDayjs = timestamp => dayjsBase(timestamp).utcOffset(8)
 
 const route = useRoute()
 const chart = shallowRef(null)
@@ -12,8 +25,10 @@ const selectedSymbol = ref('00001') // 当前展示的股票代码
 const isConnected = ref(false) // 添加连接状态变量
 const useTestData = ref(true) // 是否使用测试数据
 const searchInput = ref('') // 搜索输入
-const stockOptions = ref([]) // 可选股票列表
 const isLoadingStocks = ref(false) // 加载股票列表状态
+const currentChartType = ref('day') // 默认显示日K
+const chartLoading = ref(false)
+const chartError = ref(false)
 const styles = {
   grid: {
     show: true,
@@ -489,10 +504,29 @@ const styles = {
     },
   },
 }
-
 const currentStockName = ref()
 const currentStockCode = ref()
-
+const klineLoading = ref(false)
+const chartTypeLabels = {
+  'time': '分时',
+  'day': '日K',
+  '5day': '五日K',
+  'week': '周K',
+  'year': '年K',
+}
+const realtimeData = ref([{
+  lotSize: 100.0,
+  name: '长和',
+  price: 43.3,
+  lastPrice: 42.15,
+  openPrice: 42.25,
+  amount: 10434592.0,
+  time: '2025/04/22 16:08:14',
+  dtd: 2.73,
+  high: 43.5,
+  low: 42.2,
+},
+])
 let reconnectAttempts = 0
 let reconnectTimer = null
 let initialData = [
@@ -524,7 +558,51 @@ let initialData = [
   { open: 32.05, high: 32.10, low: 31.95, close: 32.00, volume: 1800000, timestamp: 1719352800000 }, // 26日 十字星变盘
   { open: 32.00, high: 32.50, low: 31.98, close: 32.45, volume: 4000000, timestamp: 1719439200000 }, // 27日 利好
 ]
-const klineLoading = ref(false)
+
+// 监听股票代码变化
+watch(currentStockCode, async (newVal) => {
+  if (newVal) {
+    await loadChartData()
+  }
+})
+
+// 处理菜单切换
+function handleChartTypeChange(type) {
+  currentChartType.value = type
+}
+
+// 加载数据逻辑
+async function loadChartData() {
+  try {
+    chartLoading.value = true
+    chartError.value = false
+
+    const fetchMap = {
+      'time': fetchTimeData,
+      'day': fetchDayKLine,
+      '5day': fetchFiveDayKLine,
+      'week': fetchWeekKLine,
+      'year': fetchYearKLine,
+    }
+
+    const fetchMethod = fetchMap[currentChartType.value]
+    if (!fetchMethod) {
+      throw new Error('未知的图表类型')
+    }
+
+    chart.value.applyNewData(await fetchMethod(currentStockCode.value))
+  }
+  catch (err) {
+    chartError.value = true
+    ElMessage.error('图表加载失败:', err)
+  }
+  finally {
+    chartLoading.value = false
+  }
+}
+
+// 监听图表类型变化
+watch(currentChartType, loadChartData)
 
 // 新增防抖函数
 function debounce(fn, delay) {
@@ -532,63 +610,6 @@ function debounce(fn, delay) {
   return (...args) => {
     clearTimeout(timer)
     timer = setTimeout(() => fn.apply(this, args), delay)
-  }
-}
-
-const realtimeData = ref([{
-  lotSize: 100.0,
-  name: '长和',
-  price: 43.3,
-  lastPrice: 42.15,
-  openPrice: 42.25,
-  amount: 10434592.0,
-  time: '2025/04/22 16:08:14',
-  dtd: 2.73,
-  high: 43.5,
-  low: 42.2,
-},
-])
-
-// 使用安全字符过滤
-function sanitizeName(name) {
-  if (!name)
-    return ''
-  return name.replace(/[<>&"']/g, '') // 过滤特殊字符防止XSS
-}
-
-async function fetchStockName(stockCode) {
-  // 新增参数验证环节
-  if (!stockCode || typeof stockCode !== 'string') {
-    console.error('股票代码参数不合法')
-    return ''
-  }
-
-  try {
-    const encodedCode = encodeURIComponent(stockCode)
-    const response = await axios.get(
-      `http://localhost:8080/api/v1/market/getstock/${encodedCode}`,
-    )
-
-    // 优化数据校验逻辑
-    const isValidResponse = Array.isArray(response?.data)
-      && response.data.length > 0
-      && response.data[0]?.stockCode === stockCode
-
-    if (!isValidResponse) {
-      console.warn('接口返回数据异常', response.data)
-      return ''
-    }
-    return sanitizeName(response.data[0].name) || ''
-  }
-  catch (err) {
-    // 分级错误处理
-    const errorType = err.code === 'ECONNABORTED'
-      ? '请求超时'
-      : err.response
-        ? `服务器错误 (${err.response.status})`
-        : '网络异常'
-    console.error(`股票名称查询失败(${errorType})`, err)
-    return ''
   }
 }
 
@@ -630,40 +651,49 @@ const handleCodeInput = debounce(async (value) => {
   }
 }, 500) // 500毫秒防抖
 
-// 搜索过滤
-function filterStocks(queryString) {
-  if (queryString) {
-    const lowercaseQuery = queryString.toLowerCase()
-    return stockOptions.value.filter(
-      stock => stock.value.toLowerCase().includes(lowercaseQuery)
-        || stock.label.toLowerCase().includes(lowercaseQuery)
-        || (stock.value && stock.value.toLowerCase().includes(lowercaseQuery))
-        || (stock.market && stock.market.toLowerCase().includes(lowercaseQuery)),
+// 使用安全字符过滤
+function sanitizeName(name) {
+  if (!name)
+    return ''
+  return name.replace(/[<>&"']/g, '') // 过滤特殊字符防止XSS
+}
+async function fetchStockName(stockCode) {
+  // 新增参数验证环节
+  if (!stockCode || typeof stockCode !== 'string') {
+    ElMessage.error('股票代码参数不合法')
+    return ''
+  }
+
+  try {
+    const encodedCode = encodeURIComponent(stockCode)
+    const response = await axios.get(
+      `http://localhost:8080/api/v1/market/getstock/${encodedCode}`,
     )
-  }
-  return stockOptions.value
-}
 
-// 处理搜索结果
-function handleSelect(item) {
-  if (typeof item === 'string') {
-    // 如果直接输入了股票代码
-    const stock = stockOptions.value.find(s => s.value === item.toUpperCase())
-    if (stock) {
-      switchStock(stock.value)
+    // 优化数据校验逻辑
+    const isValidResponse = Array.isArray(response?.data)
+      && response.data.length > 0
+      && response.data[0]?.stockCode === stockCode
+
+    if (!isValidResponse) {
+      ElMessage.warning('接口返回数据异常', response.data)
+      return ''
     }
+    return sanitizeName(response.data[0].name) || ''
   }
-  else {
-    // 如果选择了下拉菜单中的项目
-    switchStock(item.value)
+  catch (err) {
+    // 分级错误处理
+    const errorType = err.code === 'ECONNABORTED'
+      ? '请求超时'
+      : err.response
+        ? `服务器错误 (${err.response.status})`
+        : '网络异常'
+    ElMessage.error(`股票名称查询失败(${errorType})`, err)
+    return ''
   }
-  searchInput.value = '' // 清空搜索框
 }
-
-// 远程搜索处理
-function querySearch(queryString, cb) {
-  const results = filterStocks(queryString)
-  cb(results)
+async function fetchTimeData(stockCode) {
+  return undefined
 }
 
 // 安全数值转换逻辑
@@ -674,7 +704,7 @@ function safeParse(value) {
 
 async function fetchKLineData(stockCode) {
   if (!stockCode) {
-    console.error('股票代码不能为空')
+    ElMessage.error('股票代码不能为空')
     return []
   }
   try {
@@ -733,6 +763,12 @@ async function fetchKLineData(stockCode) {
   }
 }
 
+async function fetchDayKLine(stockCode) {
+  const processedData = await fetchKLineData(stockCode)
+  initialData = processedData
+  return processedData
+}
+
 // 五日K线 (fetchFiveDayKLine):
 //
 // 每5个交易日作为一个周期
@@ -741,19 +777,6 @@ async function fetchKLineData(stockCode) {
 // 最高价取周期内所有交易日的最高价
 // 最低价取周期内所有交易日的最低价
 // 成交量取周期内所有交易日的总和
-async function fetchDayKLine(stockCode) {
-  const processedData = await fetchKLineData(stockCode)
-  initialData = processedData
-  return processedData
-}
-
-// 周K线 (fetchWeekKLine):
-//
-// 使用ISO周标准（周一为一周的第一天）
-// 按照每年的周数进行分组
-// 开盘价取周第一个交易日的开盘价
-// 收盘价取周最后一个交易日的收盘价
-// 其他指标计算方式与五日K线类似
 async function fetchFiveDayKLine(stockCode) {
   const dayData = await fetchKLineData(stockCode)
   if (!dayData.length)
@@ -781,53 +804,60 @@ async function fetchFiveDayKLine(stockCode) {
   return fiveDayData
 }
 
+// 周K线 (fetchWeekKLine):
+//
+// 使用ISO周标准（周一为一周的第一天）
+// 按照每年的周数进行分组
+// 开盘价取周第一个交易日的开盘价
+// 收盘价取周最后一个交易日的收盘价
+// 其他指标计算方式与五日K线类似
+function getYearWeekKey(timestamp) {
+  // ISO标准处理跨年周
+  const date = myDayjs(timestamp)
+  return `${date.isoWeekYear()}-W${date.isoWeek().toString().padStart(2, '0')}`
+}
+
 async function fetchWeekKLine(stockCode) {
-  const dayData = await fetchKLineData(stockCode)
-  if (!dayData.length)
+  try {
+    const dayData = await fetchKLineData(stockCode)
+    if (!dayData?.length)
+      return []
+
+    const weekGroups = new Map()
+
+    // 生成周分组（保留时间顺序）
+    dayData.sort((a, b) => a.timestamp - b.timestamp)
+      .forEach((item) => {
+        const weekKey = getYearWeekKey(item.timestamp)
+
+        if (!weekGroups.has(weekKey)) {
+          weekGroups.set(weekKey, [])
+        }
+        weekGroups.get(weekKey).push(item)
+      })
+
+    // 转换为周K线数据
+    const weekData = Array.from(weekGroups.values())
+      .filter(group => group.length > 0)
+      .map(group => ({
+        open: group[0].open,
+        close: group[group.length - 1].close,
+        high: Math.max(...group.map(i => i.high)),
+        low: Math.min(...group.map(i => i.low)),
+        volume: group.reduce((sum, i) => sum + i.volume, 0),
+        timestamp: group[0].timestamp,
+      }))
+    initialData = weekData
+    return weekData
+  }
+  catch (error) {
+    ElMessage.error('周K线处理异常:', {
+      stockCode,
+      error: error.message,
+      stack: error.stack,
+    })
     return []
-  const weekData = []
-  let currentWeek = null
-  let tempWeekData = []
-
-  // 按照周分组
-  for (const item of dayData) {
-    const date = new Date(item.timestamp)
-    // ISO标准中周一是1，周日是7
-    const weekNumber = window.dayjs(item.timestamp).isoWeek()
-    const year = window.dayjs(item.timestamp).isoWeekYear()
-    const weekKey = `${year}-${weekNumber}`
-
-    if (weekKey !== currentWeek) {
-      if (tempWeekData.length > 0) {
-        const open = tempWeekData[0].open
-        const close = tempWeekData[tempWeekData.length - 1].close
-        const high = Math.max(...tempWeekData.map(item => item.high))
-        const low = Math.min(...tempWeekData.map(item => item.low))
-        const volume = tempWeekData.reduce((sum, item) => sum + item.volume, 0)
-        const timestamp = tempWeekData[0].timestamp
-
-        weekData.push({ open, high, low, close, volume, timestamp })
-      }
-      tempWeekData = [item]
-      currentWeek = weekKey
-    }
-    else {
-      tempWeekData.push(item)
-    }
   }
-  // 处理最后一周数据
-  if (tempWeekData.length > 0) {
-    const open = tempWeekData[0].open
-    const close = tempWeekData[tempWeekData.length - 1].close
-    const high = Math.max(...tempWeekData.map(item => item.high))
-    const low = Math.min(...tempWeekData.map(item => item.low))
-    const volume = tempWeekData.reduce((sum, item) => sum + item.volume, 0)
-    const timestamp = tempWeekData[0].timestamp
-
-    weekData.push({ open, high, low, close, volume, timestamp })
-  }
-  initialData = weekData
-  return weekData
 }
 
 // 年K线 (fetchYearKLine):
@@ -880,6 +910,42 @@ async function fetchYearKLine(stockCode) {
   }
   initialData = yearData
   return yearData
+}
+
+// 搜索过滤
+function filterStocks(queryString) {
+  if (queryString) {
+    const lowercaseQuery = queryString.toLowerCase()
+    return stockOptions.value.filter(
+      stock => stock.value.toLowerCase().includes(lowercaseQuery)
+        || stock.label.toLowerCase().includes(lowercaseQuery)
+        || (stock.value && stock.value.toLowerCase().includes(lowercaseQuery))
+        || (stock.market && stock.market.toLowerCase().includes(lowercaseQuery)),
+    )
+  }
+  return stockOptions.value
+}
+
+// 处理搜索结果
+function handleSelect(item) {
+  if (typeof item === 'string') {
+    // 如果直接输入了股票代码
+    const stock = stockOptions.value.find(s => s.value === item.toUpperCase())
+    if (stock) {
+      switchStock(stock.value)
+    }
+  }
+  else {
+    // 如果选择了下拉菜单中的项目
+    switchStock(item.value)
+  }
+  searchInput.value = '' // 清空搜索框
+}
+
+// 远程搜索处理
+function querySearch(queryString, cb) {
+  const results = filterStocks(queryString)
+  cb(results)
 }
 
 // 创建WebSocket连接
@@ -969,11 +1035,11 @@ function createWebSocketConnection() {
       }
     }
     ws.value.onerror = (error) => {
-      console.error('WebSocket错误:', error)
+      ElMessage.error('WebSocket错误:', error)
     }
   }
   catch (error) {
-    console.error('创建WebSocket连接时出错:', error)
+    ElMessage.error('创建WebSocket连接时出错:', error)
   }
 }
 
@@ -1045,7 +1111,7 @@ function updateChartData(kLine) {
 function initChart() {
   const container = document.getElementById('chart-container')
   if (!container) {
-    console.error('找不到图表容器')
+    ElMessage.error('找不到图表容器')
     return
   }
   chart.value = init('chart-container')
@@ -1100,7 +1166,8 @@ onUnmounted(() => {
                 {{ currentStockName || '未选择股票' }}
               </div>
               <div class="text-gray-500">
-                {{ currentStockCode ? `${currentStockCode} 即时行情` : '输入股票代码查看详情' }}
+                {{ currentStockCode ? `股票代码：${currentStockCode} | 即时行情`
+                  : '输入股票代码查看详情' }}
               </div>
             </div>
             <div class="mt-3 flex items-center md:ml-4 md:mt-0">
@@ -1127,15 +1194,45 @@ onUnmounted(() => {
 
       <!-- K线图容器 -->
       <div class="chart-wrapper mb-4">
+        <!-- 横向导航菜单 -->
+        <el-menu
+          mode="horizontal"
+          class="chart-menu"
+          :default-active="currentChartType"
+          @select="handleChartTypeChange"
+        >
+          <el-menu-item index="time">
+            分时图
+          </el-menu-item>
+          <el-menu-item index="day">
+            日K
+          </el-menu-item>
+          <el-menu-item index="5day">
+            五日K
+          </el-menu-item>
+          <el-menu-item index="week">
+            周K
+          </el-menu-item>
+          <el-menu-item index="year">
+            年K
+          </el-menu-item>
+        </el-menu>
         <div class="chart-title text-xl font-bold">
-          日K线图
+          {{ chartTypeLabels[currentChartType] }}线图
         </div>
         <div id="chart-container">
           <div v-if="!currentStockCode" class="chart-prompt">
             请输入股票代码加载图表
           </div>
-          <div v-else-if="!chart" class="loading-chart">
-            正在加载{{ currentStockCode }}的K线数据...
+          <div v-else class="chart-content">
+            <template v-if="chartLoading">
+              <el-skeleton :rows="3" animated />
+            </template>
+            <template v-else>
+              <div v-if="chartError" class="chart-error">
+                图表加载失败，请重试
+              </div>
+            </template>
           </div>
         </div>
       </div>
@@ -1188,5 +1285,43 @@ onUnmounted(() => {
 .stock-search-container {
   position: relative;
   min-height: 100px;
+}
+
+.chart-menu {
+  margin-bottom: 20px;
+  border-bottom: none;
+
+  :deep(.el-menu-item) {
+    font-size: 14px;
+    padding: 0 20px;
+    transition: all 0.3s;
+
+    &:hover {
+      background: #f5f7fa;
+    }
+
+    &.is-active {
+      color: #409eff;
+      border-bottom: 2px solid #409eff;
+    }
+  }
+}
+
+.chart-title {
+  padding: 0 0 15px 10px;
+  color: #333;
+}
+
+.chart-prompt,
+.loading-chart {
+  padding: 20px;
+  text-align: center;
+  color: #909399;
+}
+
+.chart-error {
+  color: #f56c6c;
+  padding: 20px;
+  text-align: center;
 }
 </style>
