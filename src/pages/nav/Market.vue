@@ -2,14 +2,13 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { dispose, init } from 'klinecharts'
-import { onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
+import { onMounted, onUnmounted, ref, shallowRef } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
 const chart = shallowRef(null)
 const ws = shallowRef(null)
 const selectedSymbol = ref('00001') // 当前展示的股票代码
-const indicator = ref('')
 const isConnected = ref(false) // 添加连接状态变量
 const useTestData = ref(true) // 是否使用测试数据
 const searchInput = ref('') // 搜索输入
@@ -491,13 +490,11 @@ const styles = {
   },
 }
 
-const currentStockName = ref('长和')
-const currentStockCode = ref('00001')
+const currentStockName = ref()
+const currentStockCode = ref()
 
 let reconnectAttempts = 0
 let reconnectTimer = null
-
-// 用于存储K线数据的响应式引用
 let initialData = [
   { open: 30.50, high: 30.80, low: 30.20, close: 30.60, volume: 1584000, timestamp: 1717192800000 },
   { open: 30.60, high: 31.20, low: 30.50, close: 31.10, volume: 2245000, timestamp: 1717279200000 },
@@ -528,6 +525,7 @@ let initialData = [
   { open: 32.00, high: 32.50, low: 31.98, close: 32.45, volume: 4000000, timestamp: 1719439200000 }, // 27日 利好
 ]
 const klineLoading = ref(false)
+
 // 新增防抖函数
 function debounce(fn, delay) {
   let timer
@@ -551,6 +549,49 @@ const realtimeData = ref([{
 },
 ])
 
+// 使用安全字符过滤
+function sanitizeName(name) {
+  if (!name)
+    return ''
+  return name.replace(/[<>&"']/g, '') // 过滤特殊字符防止XSS
+}
+
+async function fetchStockName(stockCode) {
+  // 新增参数验证环节
+  if (!stockCode || typeof stockCode !== 'string') {
+    console.error('股票代码参数不合法')
+    return ''
+  }
+
+  try {
+    const encodedCode = encodeURIComponent(stockCode)
+    const response = await axios.get(
+      `http://localhost:8080/api/v1/market/getstock/${encodedCode}`,
+    )
+
+    // 优化数据校验逻辑
+    const isValidResponse = Array.isArray(response?.data)
+      && response.data.length > 0
+      && response.data[0]?.stockCode === stockCode
+
+    if (!isValidResponse) {
+      console.warn('接口返回数据异常', response.data)
+      return ''
+    }
+    return sanitizeName(response.data[0].name) || ''
+  }
+  catch (err) {
+    // 分级错误处理
+    const errorType = err.code === 'ECONNABORTED'
+      ? '请求超时'
+      : err.response
+        ? `服务器错误 (${err.response.status})`
+        : '网络异常'
+    console.error(`股票名称查询失败(${errorType})`, err)
+    return ''
+  }
+}
+
 // 修改后的输入处理逻辑
 const handleCodeInput = debounce(async (value) => {
   if (!value) {
@@ -569,18 +610,12 @@ const handleCodeInput = debounce(async (value) => {
     }
     // 新修改点：直接使用输入值
     currentStockCode.value = value.toUpperCase()
-
-    // 并行获取数据
+    currentStockName.value = await fetchStockName(currentStockCode.value)
     await Promise.all([
-      // fetchStockDetails(value),
       fetchDayKLine(value),
     ])
     // 更新图表
     if (chart.value) {
-      // chart.value.updateOptions({
-      //   title: { text: `${currentStockName.value} (${value})` },
-      // })
-      console.log(initialData)
       chart.value.applyNewData(initialData)
     }
     else {
@@ -631,37 +666,31 @@ function querySearch(queryString, cb) {
   cb(results)
 }
 
-// 获取当前股票名称
+// 安全数值转换逻辑
+function safeParse(value) {
+  const num = Number(value)
+  return Number.isFinite(num) ? num : 0
+}
 
-async function fetchDayKLine(stockCode) {
-  // 空值保护
+async function fetchKLineData(stockCode) {
   if (!stockCode) {
     console.error('股票代码不能为空')
     return []
   }
-
   try {
     klineLoading.value = true
-
     const response = await axios.get(
       `http://localhost:5000/daykline/${encodeURIComponent(stockCode)}`,
     )
-
-    // 核心数据提取与校验
     const rawData = response.data.data?.[stockCode] || []
 
     // 数据处理流水线
     const processedData = rawData.map((item) => {
-      // 防御性解构（索引位置需与Python接口对齐）
       const [dateStr, open, close, high, low, volume] = item
-
-      // 时间戳转换（带时区安全处理）
       const parseDate = (dateStr) => {
-        // 处理沪深港三种不同日期格式
         const datePatterns = [
           'yyyy-MM-dd', // 常规格式
         ]
-
         let timestamp = Date.parse(dateStr)
         // 尝试多种格式解析
         if (Number.isNaN(timestamp)) {
@@ -675,13 +704,6 @@ async function fetchDayKLine(stockCode) {
         }
         return timestamp || Date.now()
       }
-
-      // 安全数值转换逻辑
-      const safeParse = (value) => {
-        const num = Number(value)
-        return Number.isFinite(num) ? num : 0
-      }
-
       return {
         open: safeParse(open),
         high: safeParse(high),
@@ -694,26 +716,170 @@ async function fetchDayKLine(stockCode) {
 
     // 按时间升序排列
     processedData.sort((a, b) => a.timestamp - b.timestamp)
-
-    initialData = processedData
     return processedData
   }
   catch (err) {
-    console.error('[K线数据获取失败]', err)
-
-    // 异常处理分级
+    // 异常处理
     const errorMessage = err.response
       ? `服务器错误 (${err.response.status})`
       : err.message.includes('Network')
         ? '网络连接异常'
         : '数据解析失败'
-
     ElMessage.error(`K线数据加载失败：${errorMessage}`)
     return []
   }
   finally {
     klineLoading.value = false
   }
+}
+
+// 五日K线 (fetchFiveDayKLine):
+//
+// 每5个交易日作为一个周期
+// 开盘价取周期第一个交易日的开盘价
+// 收盘价取周期最后一个交易日的收盘价
+// 最高价取周期内所有交易日的最高价
+// 最低价取周期内所有交易日的最低价
+// 成交量取周期内所有交易日的总和
+async function fetchDayKLine(stockCode) {
+  const processedData = await fetchKLineData(stockCode)
+  initialData = processedData
+  return processedData
+}
+
+// 周K线 (fetchWeekKLine):
+//
+// 使用ISO周标准（周一为一周的第一天）
+// 按照每年的周数进行分组
+// 开盘价取周第一个交易日的开盘价
+// 收盘价取周最后一个交易日的收盘价
+// 其他指标计算方式与五日K线类似
+async function fetchFiveDayKLine(stockCode) {
+  const dayData = await fetchKLineData(stockCode)
+  if (!dayData.length)
+    return []
+  const fiveDayData = []
+  let tempData = []
+
+  // 按照5天一个周期分组
+  for (let i = 0; i < dayData.length; i++) {
+    tempData.push(dayData[i])
+
+    if (tempData.length === 5 || i === dayData.length - 1) {
+      const open = tempData[0].open
+      const close = tempData[tempData.length - 1].close
+      const high = Math.max(...tempData.map(item => item.high))
+      const low = Math.min(...tempData.map(item => item.low))
+      const volume = tempData.reduce((sum, item) => sum + item.volume, 0)
+      const timestamp = tempData[0].timestamp
+
+      fiveDayData.push({ open, high, low, close, volume, timestamp })
+      tempData = []
+    }
+  }
+  initialData = fiveDayData
+  return fiveDayData
+}
+
+async function fetchWeekKLine(stockCode) {
+  const dayData = await fetchKLineData(stockCode)
+  if (!dayData.length)
+    return []
+  const weekData = []
+  let currentWeek = null
+  let tempWeekData = []
+
+  // 按照周分组
+  for (const item of dayData) {
+    const date = new Date(item.timestamp)
+    // ISO标准中周一是1，周日是7
+    const weekNumber = window.dayjs(item.timestamp).isoWeek()
+    const year = window.dayjs(item.timestamp).isoWeekYear()
+    const weekKey = `${year}-${weekNumber}`
+
+    if (weekKey !== currentWeek) {
+      if (tempWeekData.length > 0) {
+        const open = tempWeekData[0].open
+        const close = tempWeekData[tempWeekData.length - 1].close
+        const high = Math.max(...tempWeekData.map(item => item.high))
+        const low = Math.min(...tempWeekData.map(item => item.low))
+        const volume = tempWeekData.reduce((sum, item) => sum + item.volume, 0)
+        const timestamp = tempWeekData[0].timestamp
+
+        weekData.push({ open, high, low, close, volume, timestamp })
+      }
+      tempWeekData = [item]
+      currentWeek = weekKey
+    }
+    else {
+      tempWeekData.push(item)
+    }
+  }
+  // 处理最后一周数据
+  if (tempWeekData.length > 0) {
+    const open = tempWeekData[0].open
+    const close = tempWeekData[tempWeekData.length - 1].close
+    const high = Math.max(...tempWeekData.map(item => item.high))
+    const low = Math.min(...tempWeekData.map(item => item.low))
+    const volume = tempWeekData.reduce((sum, item) => sum + item.volume, 0)
+    const timestamp = tempWeekData[0].timestamp
+
+    weekData.push({ open, high, low, close, volume, timestamp })
+  }
+  initialData = weekData
+  return weekData
+}
+
+// 年K线 (fetchYearKLine):
+//
+// 按照年份分组
+// 开盘价取年第一个交易日的开盘价
+// 收盘价取年最后一个交易日的收盘价
+// 其他指标计算方式与五日K线类似
+async function fetchYearKLine(stockCode) {
+  const dayData = await fetchKLineData(stockCode)
+  if (!dayData.length)
+    return []
+  const yearData = []
+  let currentYear = null
+  let tempYearData = []
+
+  // 按照年分组
+  for (const item of dayData) {
+    const year = new Date(item.timestamp).getFullYear()
+
+    if (year !== currentYear) {
+      if (tempYearData.length > 0) {
+        const open = tempYearData[0].open
+        const close = tempYearData[tempYearData.length - 1].close
+        const high = Math.max(...tempYearData.map(item => item.high))
+        const low = Math.min(...tempYearData.map(item => item.low))
+        const volume = tempYearData.reduce((sum, item) => sum + item.volume, 0)
+        const timestamp = tempYearData[0].timestamp
+
+        yearData.push({ open, high, low, close, volume, timestamp })
+      }
+      tempYearData = [item]
+      currentYear = year
+    }
+    else {
+      tempYearData.push(item)
+    }
+  }
+
+  // 处理最后一年数据
+  if (tempYearData.length > 0) {
+    const open = tempYearData[0].open
+    const close = tempYearData[tempYearData.length - 1].close
+    const high = Math.max(...tempYearData.map(item => item.high))
+    const low = Math.min(...tempYearData.map(item => item.low))
+    const volume = tempYearData.reduce((sum, item) => sum + item.volume, 0)
+    const timestamp = tempYearData[0].timestamp
+
+    yearData.push({ open, high, low, close, volume, timestamp })
+  }
+  initialData = yearData
+  return yearData
 }
 
 // 创建WebSocket连接
@@ -776,14 +942,12 @@ function createWebSocketConnection() {
           low: +targetData.low.toFixed(2),
           volume: targetData.volume,
         })
-
         // 更新实时数据表格
         realtimeData.value.unshift({
           time: new Date(targetData.timestamp).toLocaleTimeString(),
           price: targetData.close.toFixed(2),
           volume: targetData.volume,
         })
-
         // 限制表格数据量
         if (realtimeData.value.length > 10) {
           realtimeData.value = realtimeData.value.slice(0, 10)
@@ -793,21 +957,17 @@ function createWebSocketConnection() {
         ElMessage.error('处理WebSocket消息时出错:', error)
       }
     }
-
     ws.value.onclose = (event) => {
       isConnected.value = false
-
       // 尝试重连
       if (reconnectAttempts < 5) {
         const delay = Math.min(1000 * 2 ** reconnectAttempts, 30000)
-
         reconnectTimer = setTimeout(() => {
           reconnectAttempts++
           createWebSocketConnection()
         }, delay)
       }
     }
-
     ws.value.onerror = (error) => {
       console.error('WebSocket错误:', error)
     }
@@ -883,65 +1043,16 @@ function updateChartData(kLine) {
 
 // 初始化图表并设置基本配置
 function initChart() {
-  // 确保容器存在
   const container = document.getElementById('chart-container')
   if (!container) {
     console.error('找不到图表容器')
     return
   }
-
-  // 初始化图表
   chart.value = init('chart-container')
-
-  // 设置图表样式
   chart.value.setStyles(styles)
-
   const initialData = []
-
-  // 设置初始数据
   chart.value.applyNewData(initialData)
-
-  // 添加技术指标
-  if (indicator.value) {
-    addindicator(indicator.value)
-  }
 }
-
-// 添加技术指标
-function addindicator(type) {
-  if (!chart.value)
-    return
-
-  // 移除现有指标
-  const panes = chart.value.getpanes()
-  panes.foreach((pane) => {
-    if (pane.id !== 'candle_pane') {
-      chart.value.removepane(pane.id)
-    }
-  })
-
-  // 添加新指标
-  switch (type) {
-    case 'macd':
-      chart.value.createIndicator('MACD', false, { id: 'macd_pane' })
-      break
-    case 'rsi':
-      chart.value.createIndicator('RSI', false, { id: 'rsi_pane' })
-      break
-    case 'boll':
-      chart.value.createIndicator('BOLL', true)
-      break
-    default:
-      break
-  }
-}
-
-// 监听指标变化
-watch(indicator, (newValue) => {
-  if (newValue) {
-    addIndicator(newValue)
-  }
-})
 
 // 从URL参数获取股票代码
 onMounted(async () => {
@@ -950,7 +1061,6 @@ onMounted(async () => {
   if (codeParam && typeof codeParam === 'string') {
     selectedSymbol.value = codeParam
   }
-
   initChart()
   // 创建WebSocket连接
   // createWebSocketConnection()
@@ -963,7 +1073,6 @@ onUnmounted(() => {
   if (reconnectTimer) {
     clearTimeout(reconnectTimer)
   }
-
   // 关闭WebSocket连接
   if (ws.value) {
     // 发送取消订阅请求
@@ -991,7 +1100,6 @@ onUnmounted(() => {
                 {{ currentStockName || '未选择股票' }}
               </div>
               <div class="text-gray-500">
-                <!--                {{ currentStockInfo }} -->
                 {{ currentStockCode ? `${currentStockCode} 即时行情` : '输入股票代码查看详情' }}
               </div>
             </div>
@@ -1007,7 +1115,9 @@ onUnmounted(() => {
                 @input="handleCodeInput"
               >
                 <template #prefix>
-                  <el-icon><Search /></el-icon>
+                  <el-icon>
+                    <Search />
+                  </el-icon>
                 </template>
               </el-input>
             </div>
@@ -1019,12 +1129,8 @@ onUnmounted(() => {
       <div class="chart-wrapper mb-4">
         <div class="chart-title text-xl font-bold">
           日K线图
-          <span v-if="currentStockCode" class="ml-2 text-sm text-gray-500">
-            {{ currentStockCode }} | {{ currentStockName }}
-          </span>
         </div>
         <div id="chart-container">
-          <!-- 根据输入状态显示不同提示 -->
           <div v-if="!currentStockCode" class="chart-prompt">
             请输入股票代码加载图表
           </div>
@@ -1058,12 +1164,6 @@ onUnmounted(() => {
 </template>
 
 <style>
-/* 自定义图表工具提示 */
-.tv-lightweight-charts {
-  --tooltip-background: rgba(26, 29, 36, 0.9);
-  --tooltip-border-color: #2b2f3a;
-}
-
 .list-container {
   display: flex;
   gap: 20px;
@@ -1078,10 +1178,6 @@ onUnmounted(() => {
   border: 1px solid #eaeaea;
   border-radius: 4px;
   overflow: hidden;
-}
-
-.min-h-screen {
-  min-height: 100vh;
 }
 
 .flex-grow {
