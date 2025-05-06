@@ -24,7 +24,7 @@ const isConnected = ref(false) // 添加连接状态变量
 const useTestData = ref(true) // 是否使用测试数据
 const searchInput = ref('') // 搜索输入
 const isLoadingStocks = ref(false) // 加载股票列表状态
-const currentChartType = ref('day') // 默认显示日K
+const currentChartType = ref('time') // 默认显示日K
 const chartLoading = ref(false)
 const chartError = ref(false)
 const styles = {
@@ -527,35 +527,13 @@ const realtimeData = ref([{
 ])
 let reconnectAttempts = 0
 let reconnectTimer = null
-let initialData = [
-  { open: 30.50, high: 30.80, low: 30.20, close: 30.60, volume: 1584000, timestamp: 1717192800000 },
-  { open: 30.60, high: 31.20, low: 30.50, close: 31.10, volume: 2245000, timestamp: 1717279200000 },
-  { open: 31.10, high: 31.45, low: 30.95, close: 31.05, volume: 1892000, timestamp: 1717365600000 },
-  { open: 31.05, high: 31.15, low: 30.75, close: 30.90, volume: 1423000, timestamp: 1717452000000 },
-  { open: 30.95, high: 31.60, low: 30.90, close: 31.55, volume: 2817000, timestamp: 1717538400000 },
-  { open: 31.55, high: 32.00, low: 31.40, close: 31.95, volume: 2456000, timestamp: 1717624800000 },
-  { open: 31.95, high: 32.15, low: 31.60, close: 31.75, volume: 1932000, timestamp: 1717711200000 },
-  { open: 31.75, high: 31.95, low: 31.55, close: 31.75, volume: 1685000, timestamp: 1717797600000 },
-  { open: 31.75, high: 31.80, low: 31.15, close: 31.30, volume: 2163000, timestamp: 1717884000000 },
-  { open: 31.30, high: 31.65, low: 31.20, close: 31.55, volume: 1754000, timestamp: 1717970400000 },
-  { open: 31.55, high: 32.20, low: 31.50, close: 32.15, volume: 3521000, timestamp: 1718056800000 },
-  { open: 32.15, high: 32.95, low: 32.10, close: 32.80, volume: 4218000, timestamp: 1718143200000 },
-  { open: 32.80, high: 33.10, low: 32.45, close: 32.50, volume: 3852000, timestamp: 1718229600000 },
-  { open: 32.50, high: 32.70, low: 31.90, close: 32.00, volume: 2845000, timestamp: 1718316000000 },
-  { open: 32.00, high: 32.65, low: 31.95, close: 32.30, volume: 2162000, timestamp: 1718402400000 },
-  { open: 32.30, high: 32.60, low: 31.85, close: 31.90, volume: 2981000, timestamp: 1718488800000 },
-  { open: 31.90, high: 32.00, low: 31.20, close: 31.35, volume: 3725000, timestamp: 1718575200000 },
-  { open: 31.35, high: 31.80, low: 31.10, close: 31.65, volume: 2564000, timestamp: 1718661600000 },
-  { open: 31.65, high: 31.90, low: 31.50, close: 31.75, volume: 2300000, timestamp: 1718748000000 }, // 19日 反弹受阻
-  { open: 31.75, high: 31.80, low: 31.20, close: 31.30, volume: 2800000, timestamp: 1718834400000 }, // 20日 二次探底
-  { open: 31.30, high: 31.50, low: 31.10, close: 31.45, volume: 2200000, timestamp: 1718920800000 }, // 21日 锤头线止跌
-  { open: 31.45, high: 31.60, low: 31.30, close: 31.45, volume: 1500000, timestamp: 1719007200000 }, // 22日 缩量盘整
-  { open: 31.45, high: 32.00, low: 31.40, close: 31.90, volume: 3500000, timestamp: 1719093600000 }, // 23日 放量突破
-  { open: 31.90, high: 32.30, low: 31.85, close: 32.25, volume: 3000000, timestamp: 1719180000000 }, // 24日 量价齐升
-  { open: 32.25, high: 32.40, low: 32.00, close: 32.05, volume: 2500000, timestamp: 1719266400000 }, // 25日 抛压显现
-  { open: 32.05, high: 32.10, low: 31.95, close: 32.00, volume: 1800000, timestamp: 1719352800000 }, // 26日 十字星变盘
-  { open: 32.00, high: 32.50, low: 31.98, close: 32.45, volume: 4000000, timestamp: 1719439200000 }, // 27日 利好
-]
+let initialData = []
+
+// 安全数值转换逻辑
+function safeParse(value) {
+  const num = Number(value)
+  return Number.isFinite(num) ? num : 0
+}
 
 // 监听股票代码变化
 watch(currentStockCode, async (newVal) => {
@@ -584,16 +562,11 @@ async function loadChartData() {
     }
 
     const fetchMethod = fetchMap[currentChartType.value]
-    if (!fetchMethod) {
-      throw new Error('未知的图表类型')
-    }
-
-    // 获取数据
     const klineData = await fetchMethod(currentStockCode.value)
 
     // 根据图表类型设置特定样式
     if (chart.value) { // 确保 chart 实例存在
-      let specificStyles = JSON.parse(JSON.stringify(styles)) // Start with a deep copy of base styles
+      const specificStyles = JSON.parse(JSON.stringify(styles))
       if (currentChartType.value === 'time') {
         specificStyles.candle.type = 'area'
         // 自定义分时图 tooltip
@@ -648,23 +621,19 @@ const handleCodeInput = debounce(async (value) => {
     isLoadingStocks.value = true
 
     // 这里可以添加股票代码格式校验
-    if (!/^\d{5}$/.test(value)) {
+    if (!/^(\d{5}|HSI)$/i.test(value)) {
       ElMessage.warning('请输入5位数字股票代码')
       return
     }
-    // 新修改点：直接使用输入值
     currentStockCode.value = value.toUpperCase()
-    currentStockName.value = await fetchStockName(currentStockCode.value)
-    await Promise.all([
-      fetchDayKLine(value),
-    ])
-    // 更新图表
-    if (chart.value) {
-      chart.value.applyNewData(initialData)
+    // 如果是HSI，直接设置名称，否则查询
+    if (currentStockCode.value === 'HSI') {
+      currentStockName.value = '恒生指数'
     }
     else {
-      initChart()
+      currentStockName.value = await fetchStockName(currentStockCode.value)
     }
+    await loadChartData()
   }
   catch (err) {
     ElMessage.error(`加载失败: ${err.message}`)
@@ -672,7 +641,7 @@ const handleCodeInput = debounce(async (value) => {
   finally {
     isLoadingStocks.value = false
   }
-}, 500) // 500毫秒防抖
+}, 500)
 
 // 使用安全字符过滤
 function sanitizeName(name) {
@@ -724,17 +693,11 @@ async function fetchTimeData(stockCode) {
   }
   try {
     chartLoading.value = true
-    // 确保这里的端口号与您的后端服务一致
     const response = await axios.get(
       `http://localhost:8080/api/v1/market/timekline/${encodeURIComponent(stockCode)}`,
     )
 
-    const responseData = response.data
-    if (!responseData || !responseData.timeValues || !responseData.date) {
-      ElMessage.error('分时数据格式不正确')
-      return []
-    }
-
+    const responseData = response.data[0]
     const { date, timeValues } = responseData
     const year = date.substring(0, 4)
     const month = date.substring(4, 6) // dayjs 月份是 1-indexed
@@ -772,11 +735,6 @@ async function fetchTimeData(stockCode) {
   }
 }
 
-// 安全数值转换逻辑
-function safeParse(value) {
-  const num = Number(value)
-  return Number.isFinite(num) ? num : 0
-}
 
 async function fetchKLineData(stockCode) {
   if (!stockCode) {
@@ -1197,17 +1155,35 @@ function initChart() {
   // chart.value.setStyles(styles) // 样式将在 loadChartData 中根据类型动态设置
   const emptyInitialData = [] // 初始化时使用空数据，由 loadChartData 加载
   chart.value.applyNewData(emptyInitialData)
-  chart.value.setPriceVolumePrecision(2,0) // 设置价格小数位和成交量小数位 (根据实际需要调整)
+  chart.value.setPriceVolumePrecision(2, 0) // 设置价格小数位和成交量小数位 (根据实际需要调整)
 }
 
 // 从URL参数获取股票代码
 onMounted(async () => {
-  // 检查URL参数
-  const codeParam = route.query.code
-  if (codeParam && typeof codeParam === 'string') {
-    selectedSymbol.value = codeParam
+   // 检查URL参数 - 保留URL参数功能，但优先设置默认HSI
+   const codeParam = route.query.code
+   let initialCode = 'HSI' // 默认恒生指数
+   if (codeParam && typeof codeParam === 'string' && /^(\d{5}|HSI)$/i.test(codeParam)) {
+     initialCode = codeParam.toUpperCase()
+   } else {
+     // 如果URL没有有效代码，确保searchInput也反映默认值
+     searchInput.value = 'HSI'
+   }
+ 
+  // 设置初始股票代码和名称
+  currentStockCode.value = initialCode
+  if (initialCode === 'HSI') {
+    currentStockName.value = '恒生指数'
+    searchInput.value = 'HSI' // 同步输入框
   }
+  else {
+    // 如果通过URL加载了其他代码，尝试获取其名称
+    currentStockName.value = await fetchStockName(initialCode)
+    searchInput.value = initialCode // 同步输入框
+  }
+
   initChart()
+  await loadChartData() // 加载默认或URL指定的股票数据
   // 创建WebSocket连接
   // createWebSocketConnection()
 })
@@ -1232,6 +1208,14 @@ onUnmounted(() => {
     ws.value.close()
   }
 })
+
+async function switchToHSI() {
+  currentStockCode.value = 'HSI'
+  currentStockName.value = '恒生指数' // 直接设置名称
+  searchInput.value = 'HSI' // 更新输入框显示
+  await loadChartData() // 重新加载图表数据
+}
+
 </script>
 
 <template>
@@ -1269,6 +1253,9 @@ onUnmounted(() => {
                   </el-icon>
                 </template>
               </el-input>
+              <el-button type="primary" class="ml-2" @click="switchToHSI">
+                恒生指数
+              </el-button>
             </div>
           </div>
         </el-card>
