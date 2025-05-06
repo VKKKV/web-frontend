@@ -5,8 +5,6 @@ import isoWeek from 'dayjs/plugin/isoWeek'
 import isoWeekYear from 'dayjs/plugin/isoWeeksInYear'
 import timezone from 'dayjs/plugin/timezone'
 import utc from 'dayjs/plugin/utc'
-import * as echarts from 'echarts'
-
 import { ElMessage } from 'element-plus'
 import { dispose, init } from 'klinecharts'
 import { onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
@@ -18,8 +16,6 @@ dayjsBase.extend(utc)
 dayjsBase.extend(timezone)
 // 创建带中国时区的dayjs实例
 const myDayjs = timestamp => dayjsBase(timestamp).utcOffset(8)
-
-const SZHourData = null
 const route = useRoute()
 const chart = shallowRef(null)
 const ws = shallowRef(null)
@@ -592,7 +588,32 @@ async function loadChartData() {
       throw new Error('未知的图表类型')
     }
 
-    chart.value.applyNewData(await fetchMethod(currentStockCode.value))
+    // 获取数据
+    const klineData = await fetchMethod(currentStockCode.value)
+
+    // 根据图表类型设置特定样式
+    if (chart.value) { // 确保 chart 实例存在
+      let specificStyles = JSON.parse(JSON.stringify(styles)) // Start with a deep copy of base styles
+      if (currentChartType.value === 'time') {
+        specificStyles.candle.type = 'area'
+        // 自定义分时图 tooltip
+        specificStyles.candle.tooltip.custom = [
+          { title: '时间', value: '{time}' }, // klinecharts 会根据 timestamp 格式化
+          { title: '价格', value: '{close}' },
+          { title: '成交量', value: '{volume}' },
+        ]
+        specificStyles.yAxis.type = 'normal' // 分时图Y轴通常为普通类型
+      }
+      else {
+        // 恢复为默认K线样式
+        specificStyles.candle.type = styles.candle.type || 'candle_solid'
+        specificStyles.candle.tooltip.custom = styles.candle.tooltip.custom // 恢复默认tooltip
+        specificStyles.yAxis.type = styles.yAxis.type || 'normal' // 恢复默认Y轴类型
+      }
+      chart.value.setStyles(specificStyles)
+    }
+
+    chart.value.applyNewData(klineData)
   }
   catch (err) {
     chartError.value = true
@@ -697,7 +718,58 @@ async function fetchStockName(stockCode) {
 }
 
 async function fetchTimeData(stockCode) {
-  return undefined
+  if (!stockCode) {
+    ElMessage.error('股票代码不能为空')
+    return []
+  }
+  try {
+    chartLoading.value = true
+    // 确保这里的端口号与您的后端服务一致
+    const response = await axios.get(
+      `http://localhost:8080/api/v1/market/timekline/${encodeURIComponent(stockCode)}`,
+    )
+
+    const responseData = response.data
+    if (!responseData || !responseData.timeValues || !responseData.date) {
+      ElMessage.error('分时数据格式不正确')
+      return []
+    }
+
+    const { date, timeValues } = responseData
+    const year = date.substring(0, 4)
+    const month = date.substring(4, 6) // dayjs 月份是 1-indexed
+    const dayOfMonth = date.substring(6, 8)
+
+    const formattedData = timeValues.map((item) => {
+      const hour = item.time.substring(0, 2)
+      const minute = item.time.substring(2, 4)
+      const dateTimeString = `${year}-${month}-${dayOfMonth} ${hour}:${minute}:00`
+      // 将北京时间字符串解析为 UTC 时间戳
+      const timestamp = dayjsBase.tz(dateTimeString, 'Asia/Shanghai').valueOf()
+      const price = parseFloat(item.price)
+      const volume = parseInt(item.volume, 10)
+
+      return {
+        timestamp,
+        open: price,
+        high: price,
+        low: price,
+        close: price,
+        volume,
+      }
+    })
+
+    formattedData.sort((a, b) => a.timestamp - b.timestamp)
+    initialData = formattedData // 更新 initialData
+    return formattedData
+  }
+  catch (err) {
+    ElMessage.error(`加载分时数据失败: ${err.message || '未知错误'}`)
+    return []
+  }
+  finally {
+    chartLoading.value = false
+  }
 }
 
 // 安全数值转换逻辑
@@ -878,6 +950,9 @@ async function fetchYearKLine(stockCode) {
   let currentYear = null
   let tempYearData = []
 
+  // 确保按时间排序
+  dayData.sort((a, b) => a.timestamp - b.timestamp)
+
   // 按照年分组
   for (const item of dayData) {
     const year = new Date(item.timestamp).getFullYear()
@@ -886,9 +961,9 @@ async function fetchYearKLine(stockCode) {
       if (tempYearData.length > 0) {
         const open = tempYearData[0].open
         const close = tempYearData[tempYearData.length - 1].close
-        const high = Math.max(...tempYearData.map(item => item.high))
-        const low = Math.min(...tempYearData.map(item => item.low))
-        const volume = tempYearData.reduce((sum, item) => sum + item.volume, 0)
+        const high = Math.max(...tempYearData.map(d => d.high))
+        const low = Math.min(...tempYearData.map(d => d.low))
+        const volume = tempYearData.reduce((sum, d) => sum + d.volume, 0)
         const timestamp = tempYearData[0].timestamp
 
         yearData.push({ open, high, low, close, volume, timestamp })
@@ -1119,223 +1194,11 @@ function initChart() {
     return
   }
   chart.value = init('chart-container')
-  chart.value.setStyles(styles)
-  const initialData = []
-  chart.value.applyNewData(initialData)
+  // chart.value.setStyles(styles) // 样式将在 loadChartData 中根据类型动态设置
+  const emptyInitialData = [] // 初始化时使用空数据，由 loadChartData 加载
+  chart.value.applyNewData(emptyInitialData)
+  chart.value.setPriceVolumePrecision(2,0) // 设置价格小数位和成交量小数位 (根据实际需要调整)
 }
-
-// Reactive data
-const upcolor = ref('#FF0000') // growth color
-const upBorderColor = ref('#8A0000')
-const downColor = ref('#008000') // decline color
-const downBorderColor = ref('#008F28')
-const klineData = ref([]) // k-line chart data
-const hourData = ref([]) // charts table hour data
-const xData = ref([])
-const culomnColor = ref([]) // color
-const culomnValue = ref([])
-
-// Methods
-function initData() {
-  klineData.value = SZHourData.priceinfo
-  hourData.value = splitData(klineData.value)
-  initxData()
-}
-
-function initEcharts() {
-  const option = {
-    title: {
-      text: '上证指数',
-      left: 0,
-    },
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: {
-        type: 'cross', // crosshair indicator
-      },
-      borderWidth: 1,
-      borderColor: '#ccc',
-      padding: 10,
-      textStyle: {
-        color: '#000',
-      },
-      formatter(param) {
-        param = param[0]
-        return [
-          `时间: ${param.data[6]}<hr size=1 style="margin: 3px 0">`,
-          `价格: ${param.data[1]}<br/>`,
-          `涨跌额: ${param.data[2]}<br/>`,
-          `成交量: ${param.data[3]}<br/>`,
-          `涨跌幅: ${param.data[4]}<br/>`,
-        ].join('')
-      },
-    },
-    visualMap: {
-      type: 'piecewise',
-      show: false, // don't show map, only apply corresponding color division logic
-      seriesIndex: 1, // specify which series to take data from
-      dimension: 2,
-      // define the color for each segment
-      pieces: [
-        {
-          value: -1,
-          color: downColor.value,
-        },
-        {
-          value: 1,
-          color: upcolor.value,
-        },
-      ],
-    },
-    // chart position configuration
-    grid: [
-      {
-        left: '10%',
-        right: '10%',
-        height: '50%',
-      },
-      {
-        left: '10%',
-        right: '10%',
-        top: '65%',
-        height: '18%',
-      },
-    ],
-    // x-axis data
-    xAxis: [
-      // line chart
-      {
-        type: 'category',
-        data: xData.value,
-        boundaryGap: false,
-        axisLine: { onZero: false },
-        splitLine: { show: false },
-        min: 'dataMin',
-        max: 'dataMax',
-      },
-      // bar chart
-      {
-        type: 'category',
-        gridIndex: 1, // index of the grid the x-axis belongs to, defaults to the first grid
-        data: xData.value,
-        boundaryGap: false,
-        axisLine: { onZero: false },
-        axisTick: { show: false },
-        splitLine: { show: false },
-        axisLabel: { show: false },
-        min: 'dataMin',
-        max: 'dataMax',
-      },
-    ],
-    // y-axis configuration
-    yAxis: [
-      {
-        scale: true,
-        splitArea: {
-          show: true,
-        },
-      },
-      {
-        scale: true,
-        gridIndex: 1, // index of the grid the y-axis belongs to, defaults to the first grid
-        splitNumber: 2,
-        axisLabel: { show: false },
-        axisLine: { show: false },
-        axisTick: { show: false },
-        splitLine: { show: false },
-      },
-    ],
-    dataZoom: [
-      {
-        type: 'inside',
-        xAxisIndex: [0, 1],
-        start: 50, // data display range, default is 50%-100%
-        end: 100,
-      },
-      {
-        show: true,
-        xAxisIndex: [0, 1],
-        type: 'slider',
-        top: '90%',
-        start: 50, // data display range, default is 50%-100%
-        end: 100,
-      },
-    ],
-    series: [
-      {
-        type: 'line',
-        data: hourData.value,
-        symbol: 'none', // no marker pattern
-        lineStyle: {
-          width: 1,
-        },
-      },
-      {
-        name: 'Volume',
-        type: 'bar',
-        xAxisIndex: 1,
-        yAxisIndex: 1,
-        data: culomnValue.value,
-      },
-    ],
-  }
-
-  const myChart = echarts.init(document.getElementById('mychart'))
-  myChart.setOption(option)
-
-  // Adjust chart with screen size
-  window.addEventListener('resize', () => {
-    myChart.resize()
-  })
-}
-
-// x-axis data processing
-function initxData() {
-  for (let i = 0; i < klineData.value.length; i++) {
-    xData.value[i] = klineData.value[i].datetime
-  }
-  initCulomnColor()
-}
-
-// Initialize trading data and trading bar chart color parameters
-function initCulomnColor() {
-  culomnColor.value[0] = klineData.value[0].increase > 0 ? 1 : -1
-  culomnValue.value[0] = [0, klineData.value[0].volume, -1]
-  for (let i = 1; i < klineData.value.length; i++) {
-    culomnColor.value[i]
-        = klineData.value[i].price > klineData.value[i - 1].price ? 1 : -1
-    culomnValue.value[i] = [
-      i,
-      klineData.value[i].volume,
-      culomnColor.value[i],
-    ]
-  }
-}
-
-// Data calculation and splitting, converting JSON data to array data
-function splitData(jsonData) {
-  const hourData = []
-  for (let i = 0; i < jsonData.length; i++) {
-    hourData.push([
-      i,
-      jsonData[i].price,
-      jsonData[i].increase,
-      jsonData[i].volume,
-      jsonData[i].ratio,
-      jsonData[i].amount,
-      jsonData[i].datetime,
-    ])
-  }
-  return hourData
-}
-
-// Lifecycle hooks
-onMounted(() => {
-  // Data initialization
-  initData()
-  // Chart initialization
-  initEcharts()
-})
 
 // 从URL参数获取股票代码
 onMounted(async () => {
@@ -1439,9 +1302,6 @@ onUnmounted(() => {
         <div class="chart-title text-xl font-bold">
           {{ chartTypeLabels[currentChartType] }}线图
         </div>
-
-        <div id="mychart" class="echart" style="width:100%; height: 500px;" />
-
         <div id="chart-container">
           <div v-if="!currentStockCode" class="chart-prompt">
             请输入股票代码加载图表
