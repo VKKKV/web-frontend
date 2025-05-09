@@ -49,14 +49,6 @@ function handleUserClick() {
 
     <el-menu-item index="/MarketData">
       <el-icon>
-        <data-analysis />
-      </el-icon>
-      <span>行情数据</span>
-    </el-menu-item>
-
-
-    <el-menu-item index="/nav/StockInfo">
-      <el-icon>
         <info-filled />
       </el-icon>
       <span>股票信息</span>

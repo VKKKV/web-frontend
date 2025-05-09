@@ -4,25 +4,29 @@ import {
   DataLine,
   InfoFilled,
   ShoppingCart,
-  TrendCharts,
 } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
-// 跳转到实时行情页面
+// 跳转到实时行情页面 (Market)
 function goToMarketPage() {
-  router.push('/nav/test')
-}
-
-// 跳转到股票信息页面
-function goToStockInfoPage() {
-  router.push('/nav/StockInfo')
+  router.push('/nav/Market')
 }
 
 // 跳转到交易页面
 function goToTradePage() {
   router.push('/nav/Trade')
+}
+
+// 跳转到股票信息页面
+function goToMarketDataPage() {
+  router.push('/MarketData')
+}
+
+// 跳转到Login or Register or Account
+function goToLogin() {
+  router.push('/Login')
 }
 
 // 核心功能列表
@@ -32,7 +36,7 @@ const features = [
     title: '实时行情',
     description: '毫秒级行情推送，精准把握市场脉搏',
     action: '查看行情',
-    color: 'from-blue-500 to-blue-600',
+    color: 'text-blue-500',
     route: goToMarketPage,
   },
   {
@@ -40,203 +44,153 @@ const features = [
     title: '股票信息',
     description: '全面的股票基本信息和公司概况',
     action: '查看信息',
-    color: 'from-purple-500 to-purple-600',
-    route: goToStockInfoPage,
+    color: 'text-purple-500',
+    route: goToMarketDataPage,
   },
   {
     icon: ShoppingCart,
     title: '便捷交易',
     description: '一键下单，快速执行交易策略',
     action: '立即交易',
-    color: 'from-green-500 to-green-600',
+    color: 'text-green-500',
     route: goToTradePage,
-  },
-  {
-    icon: TrendCharts,
-    title: '技术分析',
-    description: '专业的技术指标和图表分析工具',
-    action: '开始分析',
-    color: 'from-orange-500 to-orange-600',
-    route: goToMarketPage,
-  },
-]
-
-// 平台优势
-const advantages = [
-  {
-    title: '高性能交易引擎',
-    description: '采用低延迟架构，交易执行速度快至毫秒级',
-  },
-  {
-    title: '安全可靠',
-    description: '多重安全防护机制，保障资金和数据安全',
-  },
-  {
-    title: '专业图表工具',
-    description: '提供丰富的技术指标和分析工具，助您做出明智决策',
-  },
-  {
-    title: '全球市场',
-    description: '覆盖全球主要股票市场，提供多元化投资选择',
   },
 ]
 </script>
 
 <template>
-  <div class="stock-home ">
-    <!-- 主页横幅 -->
-    <div class="from-blue-600 to-indigo-800 bg-gradient-to-r text-white">
-      <div class="mx-auto px-4 py-20 container md:py-32">
-        <div class="max-w-3xl">
-          <h1 class="mb-6 text-4xl font-bold md:text-5xl">
+  <div class="stock-home text-white">
+    <!-- Hero Section -->
+    <section class="relative from-blue-600 to-indigo-700 bg-gradient-to-r py-24 text-white lg:py-40 sm:py-32">
+      <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-2xl text-center">
+          <h1 class="text-4xl font-bold tracking-tight sm:text-6xl">
             专业的股票交易平台
           </h1>
-          <p class="mb-8 text-xl opacity-90 md:text-2xl">
-            安全、高效、专业的交易体验，助您把握每一次市场机会
+          <p class="mt-6 text-lg leading-8 opacity-90">
+            安全、高效、专业的交易体验，助您把握每一次市场机会。
           </p>
-          <div class="flex flex-wrap gap-4">
-            <el-button type="primary" size="large" @click="goToMarketPage">
+          <div class="mt-10">
+            <el-button type="primary" size="large" @click="goToTradePage">
               开始交易
               <el-icon class="ml-2">
                 <ArrowRight />
               </el-icon>
             </el-button>
-            <el-button type="default" size="large" plain>
-              了解更多
-            </el-button>
           </div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- 核心功能 -->
-    <div class=" py-16">
-      <div class="mx-auto px-4 container">
-        <h2 class="mb-12 text-center text-3xl  font-bold">
-          核心功能
-        </h2>
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-4 md:grid-cols-2">
-          <div
+    <!-- Features Section -->
+    <section class="py-16 sm:py-24">
+      <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto mb-12 max-w-2xl text-center lg:mb-16">
+          <h2 class="text-3xl  font-bold tracking-tight sm:text-4xl">
+            核心功能
+          </h2>
+          <p class="mt-4 text-lg leading-8">
+            探索我们平台提供的强大功能，助您在市场中领先一步。
+          </p>
+        </div>
+        <div class="grid grid-cols-1 gap-8 md:grid-cols-3">
+          <el-card
             v-for="(feature, index) in features"
             :key="index"
-            class="overflow-hidden border  shadow-md transition-shadow hover:shadow-lg"
+            shadow="hover"
+            class="feature-card border-t-4"
+            :style="{ borderTopColor: feature.color.replace('text-', '').split('-')[0] }"
           >
-            <div :class="`bg-gradient-to-r ${feature.color} p-6 `">
-              <component :is="feature.icon" class="mb-4 text-4xl" />
-              <h3 class="mb-2 text-xl font-semibold">
-                {{ feature.title }}
-              </h3>
-              <p class="mb-4 opacity-90">
-                {{ feature.description }}
-              </p>
-            </div>
-            <div class="p-4 text-right">
-              <el-button type="primary" @click="feature.route">
+            <template #header>
+              <div class="flex items-center">
+                <component :is="feature.icon" :class="`mr-3 h-8 w-8 ${feature.color}`" />
+                <h3 class="text-xl font-semibold">
+                  {{ feature.title }}
+                </h3>
+              </div>
+            </template>
+            <p class="mb-6 ">
+              {{ feature.description }}
+            </p>
+            <div class="text-right">
+              <el-button type="primary" plain @click="feature.route">
                 {{ feature.action }}
                 <el-icon class="ml-1">
                   <ArrowRight />
                 </el-icon>
               </el-button>
             </div>
-          </div>
+          </el-card>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- 平台介绍 -->
-    <div class="py-16">
-      <div class="mx-auto px-4 container">
-        <div class="flex flex-col items-center md:flex-row">
-          <div class="mb-8 md:mb-0 md:w-1/2 md:pr-8">
-            <h2 class="mb-6 text-3xl  font-bold">
+    <!-- Platform Introduction Section -->
+    <section class="py-16 sm:py-24">
+      <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="grid grid-cols-1 items-center gap-12 md:grid-cols-2">
+          <div>
+            <h2 class="text-3xl  font-bold tracking-tight sm:text-4xl">
               为什么选择 StockVision
             </h2>
-            <p class="mb-6 ">
-              StockVision 是一个专业的股票交易平台，致力于为投资者提供安全、高效、专业的交易体验。
-              我们的平台采用先进的技术架构，提供毫秒级的行情推送和交易执行，帮助您把握每一次市场机会。
+            <p class="mt-6 text-lg leading-8">
+              StockVision 致力于为投资者提供安全、高效、专业的交易体验。我们的平台采用先进的技术架构，提供毫秒级的行情推送和交易执行，助您把握每一次市场机遇。
             </p>
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div v-for="(adv, index) in advantages" :key="index" class="border-l-4 border-blue-500 py-2 pl-4">
-                <h4 class="text-lg font-semibold">
-                  {{ adv.title }}
-                </h4>
-                <p class="text-sm">
-                  {{ adv.description }}
-                </p>
-              </div>
-            </div>
+            <ul class="mt-8 space-y-4">
+              <li class="flex items-start">
+                <el-icon class="mr-2 mt-1 h-5 w-5 flex-shrink-0 text-blue-600">
+                  <DataLine />
+                </el-icon>
+                <span><strong class="font-semibold">高性能引擎:</strong> 低延迟架构，交易执行快至毫秒级。</span>
+              </li>
+              <li class="flex items-start">
+                <el-icon class="mr-2 mt-1 h-5 w-5 flex-shrink-0 text-blue-600">
+                  <InfoFilled />
+                </el-icon>
+                <span><strong class="font-semibold">安全可靠:</strong> 多重安全防护，保障资金数据安全。</span>
+              </li>
+            </ul>
           </div>
-          <div class="md:w-1/2">
+          <div class="flex justify-center">
             <img
-              src="https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?q=80&w=1470&auto=format&fit=crop"
-              alt="Trading Platform"
-              class="w-full border rounded-lg shadow-lg"
+              src="https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+              alt="Trading Platform Visualization"
+              class="max-w-md w-full rounded-lg object-cover shadow-xl"
             >
           </div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- 开始使用 -->
-    <div class="from-blue-600 to-indigo-800 bg-gradient-to-r py-16 text-center">
-      <div class="mx-auto px-4 container">
-        <h2 class="mb-6 text-3xl font-bold">
+    <!-- Call to Action Section -->
+    <section class="from-blue-600 to-indigo-700 bg-gradient-to-r py-16 text-white sm:py-24">
+      <div class="mx-auto max-w-7xl px-6 text-center lg:px-8">
+        <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">
           准备好开始交易了吗？
         </h2>
-        <p class="mx-auto mb-8 max-w-2xl text-xl opacity-90">
-          加入 StockVision，体验专业的交易工具和实时行情，把握市场每一次机会
+        <p class="mx-auto mt-6 max-w-2xl text-lg leading-8 opacity-90">
+          立即加入 StockVision，体验专业的交易工具和实时行情，把握市场机遇。
         </p>
-        <el-button type="primary" size="large" @click="goToMarketPage">
-          立即开始
-          <el-icon class="ml-2">
-            <ArrowRight />
-          </el-icon>
-        </el-button>
-      </div>
-    </div>
-
-    <!-- 简化的页脚 -->
-    <footer class="border-t  py-10 ">
-      <div class="mx-auto px-4 container">
-        <div class="grid grid-cols-1 gap-8 md:grid-cols-4">
-          <div>
-            <h3 class="mb-4 text-lg font-semibold">
-              关于我们
-            </h3>
-            <p>
-              StockVision 是一个专业的股票交易平台，致力于为投资者提供安全、高效、专业的交易体验。
-            </p>
-          </div>
-          <div>
-            <h3 class="mb-4 text-lg font-semibold">
-              产品服务
-            </h3>
-            <ul class="space-y-2">
-              <li><a href="#">行情数据</a></li>
-              <li><a href="#">交易系统</a></li>
-            </ul>
-          </div>
-          <div>
-            <h3 class="mb-4 text-lg font-semibold">
-              帮助中心
-            </h3>
-            <ul class="space-y-2">
-              <li><a href="#">新手指南</a></li>
-              <li><a href="#">常见问题</a></li>
-            </ul>
-          </div>
-          <div>
-            <h3 class="mb-4 text-lg font-semibold">
-              联系我们
-            </h3>
-            <p class="mb-2">
-              客服电话：400-123-4567
-            </p>
-            <p class="mb-2">
-              邮箱：support@stockvision.com
-            </p>
-          </div>
+        <div class="mt-10">
+          <el-button type="primary" size="large" @click="goToTradePage">
+            立即开始
+            <el-icon class="ml-2">
+              <ArrowRight />
+            </el-icon>
+          </el-button>
         </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="border-t  py-8">
+      <div class="mx-auto max-w-7xl px-6 text-center text-gray-600 lg:px-8">
+        <p class="text-sm leading-6">
+          &copy; {{ new Date().getFullYear() }} StockVision. 保留所有权利。
+        </p>
+        <p class="mt-2 text-xs leading-5">
+          投资有风险，入市需谨慎。本平台信息仅供参考，不构成投资建议。
+        </p>
       </div>
     </footer>
   </div>
@@ -247,5 +201,16 @@ const advantages = [
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+/* 为卡片添加边框颜色 */
+.feature-card {
+  border-top-width: 4px;
+  border-top-style: solid;
+}
+
+/* 确保图片在特定部分表现良好 */
+section img {
+  aspect-ratio: 16 / 10;
 }
 </style>
