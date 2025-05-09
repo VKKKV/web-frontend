@@ -1,13 +1,14 @@
 <script setup>
-import { Check, Refresh } from '@element-plus/icons-vue'
+import { Check } from '@element-plus/icons-vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, ref } from 'vue'
 import { useAuth } from '~/composables/useAuth.js'
+
 const { userId } = useAuth()
+const stockName = ref()
 const loading = ref(false)
 const tradeHistory = ref([])
-const safeParseFloat = v => Number.isFinite(+v) ? +v : 0
 const form = ref({
   symbol: '00001',
   side: 'BUY',
@@ -15,43 +16,39 @@ const form = ref({
   price: 0,
   quantity: 100,
 })
+const safeParseFloat = v => Number.isFinite(+v) ? +v : 0
+
 const cost = computed(() => {
   return (form.value.price || 0) * (form.value.quantity || 0)
 })
 
 const userHoldings = ref([
   {
-    symbol: '00001', // 股票代码
-    name: '长和', // 股票名称
-    quantity: 1000, // 总持仓
-    available: 800, // 可用数量
-    avgPrice: 42.5, // 平均成本
-    currentPrice: 41.9, // 当前市价（实时更新）
-    profit: -600, // 浮动盈亏
+    // symbol: '00001', // 股票代码
+    // name: '长和', // 股票名称
+    symbol: '', // 股票代码
+    name: '', // 股票名称
+    quantity: 0, // 总持仓
+    available: 0, // 可用数量
+    avgPrice: 0, // 平均成本
+    currentPrice: 0, // 当前市价（实时更新）
+    profit: 0, // 浮动盈亏
   },
 ])
-const stockName = ref()
 
 // 计算持仓市值和盈亏
 const holdingValues = computed(() => {
   return userHoldings.value.map((holding) => {
-    // 安全转换数值类型
     const currentPrice = Number(holding.currentPrice) || 0
     const avgPrice = Number(holding.avgPrice) || 0
     const quantity = Number(holding.quantity) || 0
-
-    // 计算浮动盈亏
     const profit = (currentPrice - avgPrice) * quantity
-
     // 计算盈亏比例（防止除零）
-    const profitRatio = avgPrice > 0
-      ? ((currentPrice - avgPrice) / avgPrice) * 100
-      : 0
-
+    const profitRatio = avgPrice > 0 ? ((currentPrice - avgPrice) / avgPrice) * 100 : 0
     return {
       ...holding,
-      currentPrice, // 确保是数字类型
-      avgPrice, // 确保是数字类型
+      currentPrice,
+      avgPrice,
       marketValue: currentPrice * quantity,
       profit,
       profitRatio,
@@ -73,7 +70,6 @@ const totalProfit = computed(() => {
   }, 0)
 })
 
-// 计算总收益率（新增）
 const totalProfitRatio = computed(() => {
   const totalCost = holdingValues.value.reduce((total, holding) => {
     return total + (Number(holding.avgPrice) * Number(holding.quantity))
@@ -103,11 +99,6 @@ async function fetchTradeHistory() {
         quantity: record.quantity,
         status: record.status,
       }))
-      const pagination = {
-        total: response.data.data.total,
-        current: response.data.data.current,
-        pageSize: response.data.data.size,
-      }
     }
   }
   catch (error) {
@@ -137,14 +128,6 @@ async function submitOrder() {
       return
     }
   }
-  // 数量单位校验
-  // const currentStock = stockList.value.find(
-  //   s => s.value === form.value.symbol,
-  // )
-  // if (form.value.quantity % (currentStock?.lotSize || 100) !== 0) {
-  //   ElMessage.warning(`委托数量必须是${currentStock?.lotSize}的整数倍`)
-  //   return
-  // }
   if (form.value.quantity % 100 !== 0) {
     ElMessage.warning(`委托数量必须是100的整数倍`)
     return
@@ -157,7 +140,7 @@ async function submitOrder() {
       stockCode: form.value.symbol,
       type: form.value.side,
       quantity: form.value.quantity,
-      price: form.value.orderType === 'LIMIT' ? form.value.price : 100,
+      price: form.value.price,
       orderType: form.value.orderType,
     }
     const response = await axios.post('/api/v1/trade/order', orderData)
@@ -206,12 +189,11 @@ async function fetchUserHoldings() {
 
     // 从交易历史中计算持仓
     const holdingsMap = {}
-
     tradeHistory.value.forEach((trade) => {
       if (!holdingsMap[trade.symbol]) {
         holdingsMap[trade.symbol] = {
           symbol: trade.symbol,
-          name: 'err',
+          name: '',
           quantity: 0,
           available: 0,
           avgPrice: 0,
@@ -220,12 +202,11 @@ async function fetchUserHoldings() {
           profit: 0,
         }
       }
-
       const holding = holdingsMap[trade.symbol]
       if (trade.side === 'BUY') {
         // 买入操作：增加持仓
         const newQuantity = holding.quantity + trade.quantity
-        holding.totalCost = holding.totalPrice * holding.quantity + trade.price * trade.quantity
+        holding.totalCost = holding.totalCost * holding.quantity + trade.price * trade.quantity
         holding.quantity = newQuantity
         holding.avgPrice = holding.totalCost / newQuantity
       }
@@ -239,7 +220,6 @@ async function fetchUserHoldings() {
         }
       }
     })
-
     // 过滤掉数量为0的持仓
     userHoldings.value = Object.values(holdingsMap)
       .filter(h => h.quantity > 0)
@@ -288,20 +268,6 @@ async function updateHoldingsPrice() {
   }
 }
 
-// 计算总市值
-// const totalMarketValue = computed(() => {
-//   return userHoldings.value.reduce((total, holding) => {
-//     return total + (holding.currentPrice * holding.quantity)
-//   }, 0)
-// })
-
-// 计算总盈亏
-// const totalProfit = computed(() => {
-//   return userHoldings.value.reduce((total, holding) => {
-//     return total + holding.profit
-//   }, 0)
-// })
-
 // 卖出操作
 function handleSell(symbol) {
   const holding = userHoldings.value.find(h => h.symbol === symbol)
@@ -320,11 +286,10 @@ function handleSell(symbol) {
 
 // 初始化加载
 onMounted(() => {
-  // fetchStockList()
   fetchTradeHistory()
   fetchUserHoldings()
   handleSymbolChange(form.value.symbol)
-  // setInterval(updateHoldingsPrice, 10000) // 每10秒刷新价格
+  // setInterval(updateHoldingsPrice, 60000) // 刷新价格
 })
 </script>
 
@@ -345,20 +310,6 @@ onMounted(() => {
             placeholder="输入港股代码"
             @change="handleSymbolChange"
           />
-          <!--          <el-select -->
-          <!--            v-model="form.symbol" -->
-          <!--            filterable -->
-          <!--            placeholder="输入股票代码" -->
-          <!--            :loading="!stockList.length" -->
-          <!--            @change="handleSymbolChange" -->
-          <!--          > -->
-          <!--            <el-option -->
-          <!--              v-for="item in stockList" -->
-          <!--              :key="item.value" -->
-          <!--              :label="item.label" -->
-          <!--              :value="item.value" -->
-          <!--            /> -->
-          <!--          </el-select> -->
         </el-form-item>
 
         <el-form-item label="股票名称">
@@ -402,17 +353,8 @@ onMounted(() => {
             v-model="form.price"
             :disabled="form.orderType === 'MARKET'"
             :readonly="form.orderType === 'MARKET'"
-            placeholder="自动生成市场价"
-          >
-            <template v-if="form.orderType === 'MARKET'" #append>
-              <el-tooltip content="点击刷新价格">
-                <el-icon @click="refreshMarketPrice">
-                  <!-- icon -->
-                  <Refresh />
-                </el-icon>
-              </el-tooltip>
-            </template>
-          </el-input>
+            placeholder="市场价"
+          />
         </el-form-item>
 
         <el-form-item v-if="form.orderType === 'LIMIT'" label="价格">
@@ -488,13 +430,13 @@ onMounted(() => {
           <el-table-column
             prop="symbol"
             label="代码"
-            width="100"
+            width="90"
             fixed
           />
           <el-table-column
             prop="name"
             label="名称"
-            min-width="120"
+            min-width="80"
           />
           <el-table-column
             label="持仓/可用"
@@ -505,6 +447,15 @@ onMounted(() => {
               <div class="text-xs text-gray-500">
                 {{ row.available.toLocaleString() }}可用
               </div>
+            </template>
+          </el-table-column>
+
+          <el-table-column
+            label="成本价"
+            width="120"
+          >
+            <template #default="{ row }">
+              {{ row.avgPrice.toFixed(2) }}
             </template>
           </el-table-column>
 
@@ -596,7 +547,7 @@ onMounted(() => {
           </el-table-column>
           <el-table-column
             prop="price"
-            label="价格"
+            label="买入价"
             min-width="140"
           >
             <template #default="{ row }">
@@ -608,6 +559,14 @@ onMounted(() => {
             label="数量"
             min-width="140"
           />
+          <el-table-column
+              label="总买入"
+              min-width="140"
+          >
+            <template #default="{ row }">
+              {{ (row.price * row.quantity).toFixed(2) }}
+            </template>
+          </el-table-column>
         </el-table>
       </el-card>
     </div>
