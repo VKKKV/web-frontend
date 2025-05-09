@@ -3,7 +3,6 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 // 修改pagination事件绑定（新增防抖处理）
 import { debounce } from 'lodash-es'
-
 import { computed, onMounted, ref, watch } from 'vue'
 
 const inputCodes = ref('')
@@ -33,7 +32,6 @@ const priceDisplay = computed(() => {
 
 const allStockCodes = ref([]) // 保存全部股票的代码集合
 const displayedCodes = ref('') // 当前页显示的股票代码集合
-
 
 async function fetchPaginatedStocks() {
   try {
@@ -70,7 +68,11 @@ async function fetchPaginatedStocks() {
     loading.value = false
   }
 }
-const handlePaginationChange = debounce(fetchPaginatedStocks, 300)
+const handlePaginationChange = debounce((newPage) => {
+  if (newPage)
+    currentPage.value = newPage
+  fetchPaginatedStocks()
+}, 300)
 
 // 价格计算逻辑函数
 function calcPriceChange(current, previous) {
@@ -280,10 +282,7 @@ onMounted(() => {
             <el-button icon="Search" @click="fetchStocks" />
           </template>
         </el-input>
-        <!-- 搜索结果表格 -->
-        <!--    <el-table v-if="stockList.length > 0" v-loading="loading" :data="stockList" style="margin-top:20px"> -->
         <el-table v-loading="loading" :data="stockList" style="margin-top:20px">
-          <!--      <el-table-column prop="stock_code" label="代码" width="120" /> -->
           <el-table-column prop="name" label="名称" />
           <el-table-column prop="price" label="当前价格" />
           <el-table-column prop="lastPrice" label="昨日收盘价格" />
@@ -338,13 +337,13 @@ onMounted(() => {
 
         <el-pagination
           class="pagination"
+          size="small"
+          background
+          pager-count="4"
           :current-page="currentPage"
-          :page-size="pageSize"
-          :page-sizes="[8, 15, 30]"
-          layout="total, sizes, prev, pager, next"
           :total="totalStocks"
-          @current-change="val => { currentPage.value = val; handlePaginationChange() }"
-          @size-change="val => { pageSize.value = val; handlePaginationChange() }"
+          layout="prev, pager, next"
+          @current-change="val => { handlePaginationChange(val) }"
         />
       </el-card>
 
