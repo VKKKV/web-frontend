@@ -512,19 +512,6 @@ const chartTypeLabels = {
   'week': '周K',
   'year': '年K',
 }
-const realtimeData = ref([{
-  lotSize: 100.0,
-  name: '长和',
-  price: 43.3,
-  lastPrice: 42.15,
-  openPrice: 42.25,
-  amount: 10434592.0,
-  time: '2025/04/22 16:08:14',
-  dtd: 2.73,
-  high: 43.5,
-  low: 42.2,
-},
-])
 let reconnectAttempts = 0
 let reconnectTimer = null
 let initialData = []
@@ -621,7 +608,7 @@ const handleCodeInput = debounce(async (value) => {
     isLoadingStocks.value = true
 
     // 这里可以添加股票代码格式校验
-    if (!/^(\d{5}|HSI)$/i.test(value)) {
+    if (!/^(?:\d{5}|HSI)$/i.test(value)) {
       ElMessage.warning('请输入5位数字股票代码')
       return
     }
@@ -709,8 +696,8 @@ async function fetchTimeData(stockCode) {
       const dateTimeString = `${year}-${month}-${dayOfMonth} ${hour}:${minute}:00`
       // 将北京时间字符串解析为 UTC 时间戳
       const timestamp = dayjsBase.tz(dateTimeString, 'Asia/Shanghai').valueOf()
-      const price = parseFloat(item.price)
-      const volume = parseInt(item.volume, 10)
+      const price = Number.parseFloat(item.price)
+      const volume = Number.parseInt(item.volume, 10)
 
       return {
         timestamp,
@@ -734,7 +721,6 @@ async function fetchTimeData(stockCode) {
     chartLoading.value = false
   }
 }
-
 
 async function fetchKLineData(stockCode) {
   if (!stockCode) {
@@ -1160,16 +1146,17 @@ function initChart() {
 
 // 从URL参数获取股票代码
 onMounted(async () => {
-   // 检查URL参数 - 保留URL参数功能，但优先设置默认HSI
-   const codeParam = route.query.code
-   let initialCode = 'HSI' // 默认恒生指数
-   if (codeParam && typeof codeParam === 'string' && /^(\d{5}|HSI)$/i.test(codeParam)) {
-     initialCode = codeParam.toUpperCase()
-   } else {
-     // 如果URL没有有效代码，确保searchInput也反映默认值
-     searchInput.value = 'HSI'
-   }
- 
+  // 检查URL参数 - 保留URL参数功能，但优先设置默认HSI
+  const codeParam = route.query.code
+  let initialCode = 'HSI' // 默认恒生指数
+  if (codeParam && typeof codeParam === 'string' && /^(\d{5}|HSI)$/i.test(codeParam)) {
+    initialCode = codeParam.toUpperCase()
+  }
+  else {
+    // 如果URL没有有效代码，确保searchInput也反映默认值
+    searchInput.value = 'HSI'
+  }
+
   // 设置初始股票代码和名称
   currentStockCode.value = initialCode
   if (initialCode === 'HSI') {
@@ -1215,7 +1202,6 @@ async function switchToHSI() {
   searchInput.value = 'HSI' // 更新输入框显示
   await loadChartData() // 重新加载图表数据
 }
-
 </script>
 
 <template>
@@ -1306,25 +1292,25 @@ async function switchToHSI() {
         </div>
       </div>
 
-      <el-row :gutter="20" class="mt-4">
-        <el-col :span="24">
-          <el-card>
-            <template #header>
-              <div class="font-bold">
-                实时数据
-              </div>
-            </template>
-            <el-table :data="realtimeData" height="200">
-              <el-table-column prop="time" label="时间" />
-              <el-table-column prop="amount" label="成交量" />
-              <el-table-column prop="price" label="当前价格" />
-              <el-table-column prop="lastPrice" label="昨日收盘价格" />
-              <el-table-column prop="high" label="当天最高价" />
-              <el-table-column prop="low" label="当天最低价" />
-            </el-table>
-          </el-card>
-        </el-col>
-      </el-row>
+<!--      <el-row :gutter="20" class="mt-4">-->
+<!--        <el-col :span="24">-->
+<!--          <el-card>-->
+<!--            <template #header>-->
+<!--              <div class="font-bold">-->
+<!--                实时数据-->
+<!--              </div>-->
+<!--            </template>-->
+<!--            <el-table :data="realtimeData" height="200">-->
+<!--              <el-table-column prop="time" label="时间" />-->
+<!--              <el-table-column prop="amount" label="成交量" />-->
+<!--              <el-table-column prop="price" label="当前价格" />-->
+<!--              <el-table-column prop="lastPrice" label="昨日收盘价格" />-->
+<!--              <el-table-column prop="high" label="当天最高价" />-->
+<!--              <el-table-column prop="low" label="当天最低价" />-->
+<!--            </el-table>-->
+<!--          </el-card>-->
+<!--        </el-col>-->
+<!--      </el-row>-->
     </div>
   </div>
 </template>
