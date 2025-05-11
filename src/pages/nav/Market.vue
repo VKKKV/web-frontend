@@ -1141,7 +1141,7 @@ function initChart() {
   // chart.value.setStyles(styles) // 样式将在 loadChartData 中根据类型动态设置
   const emptyInitialData = [] // 初始化时使用空数据，由 loadChartData 加载
   chart.value.applyNewData(emptyInitialData)
-  chart.value.setPriceVolumePrecision(2, 0) // 设置价格小数位和成交量小数位 (根据实际需要调整)
+  // chart.value.setPriceVolumePrecision(2, 0) // 设置价格小数位和成交量小数位 (根据实际需要调整)
 }
 
 // 从URL参数获取股票代码
