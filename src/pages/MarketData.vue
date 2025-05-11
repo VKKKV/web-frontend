@@ -4,6 +4,7 @@ import { ElMessage } from 'element-plus'
 // 修改pagination事件绑定（新增防抖处理）
 import { debounce } from 'lodash-es'
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router' // 引入 useRouter
 
 const inputCodes = ref('')
 const stockList = ref([])
@@ -16,8 +17,9 @@ const totalStocks = ref(0)
 const paginatedStocks = ref([])
 
 const favoriteLoading = ref(false)
+const router = useRouter() // 初始化 router
 
-// 新增计算属性处理价格变化
+// 处理价格变化
 const priceDisplay = computed(() => {
   return (stock) => {
     // price: 股票当前价格
@@ -74,6 +76,13 @@ const handlePaginationChange = debounce((newPage) => {
   fetchPaginatedStocks()
 }, 300)
 
+// 新增跳转到行情图表页面的方法
+function viewMarketChart(stockCode) {
+  if (stockCode) {
+    router.push({ name: 'Market', query: { code: stockCode } })
+  }
+}
+
 // 价格计算逻辑函数
 function calcPriceChange(current, previous) {
   if (!current || !previous || previous === 0) {
@@ -94,6 +103,8 @@ function calcPriceChange(current, previous) {
   }
 }
 
+const favoriteStocks = ref(loadFavorites())
+
 function loadFavorites() {
   try {
     return JSON.parse(localStorage.getItem('stockFavorites') || '[]')
@@ -103,7 +114,10 @@ function loadFavorites() {
   }
 }
 
-const favoriteStocks = ref(loadFavorites())
+// 安全类型转换
+// 数据清洗与转换
+const safeParseFloat = v => Number.isFinite(+v) ? +v : 0
+const safeParseInt = v => Math.abs(Number.parseInt(v)) || 0
 
 // 获取自选股实时数据
 async function fetchFavoriteStocks() {
@@ -125,10 +139,6 @@ async function fetchFavoriteStocks() {
     // 创建数据映射
     const stockUpdates = new Map(
       response.data.map((apiStock) => {
-        // 安全类型转换
-        const safeParseFloat = v => Number.isFinite(+v) ? +v : 0
-        const safeParseInt = v => Math.abs(Number.parseInt(v)) || 0
-        // 数据清洗与转换
         return [
           apiStock.stockCode,
           {
@@ -211,6 +221,7 @@ watch(
   (newVal) => {
     localStorage.setItem('stockFavorites', JSON.stringify(newVal))
   },
+  // 深度监视
   { deep: true },
 )
 
@@ -228,6 +239,7 @@ function toggleFavorite(stock) {
       addedAt: Date.now(),
     })
     ElMessage.success('已添加收藏')
+    fetchFavoriteStocks()
   }
   else {
     // 取消收藏
@@ -246,7 +258,18 @@ async function fetchStocks() {
     const response = await axios.get(
       `http://localhost:8080/api/v1/market/getstock/${inputCodes.value}`,
     )
-    stockList.value = response.data
+    // 对API返回的数据进行转换，以确保字段统一和数据类型正确
+    stockList.value = response.data.map(stock => ({
+      ...stock, // 保留原始API返回的其他字段
+      stock_code: stock.stockCode, // 将 stockCode 映射为 stock_code
+      name: stock.name, // 确保 name 字段存在
+      price: safeParseFloat(stock.price),
+      lastPrice: safeParseFloat(stock.lastPrice),
+      openPrice: safeParseFloat(stock.openPrice),
+      high: safeParseFloat(stock.high),
+      low: safeParseFloat(stock.low),
+      volume: safeParseInt(stock.amount),
+    }))
   }
   catch (err) {
     ElMessage.error(err.response?.data || '服务异常')
@@ -286,11 +309,37 @@ onMounted(() => {
           <el-table-column prop="name" label="名称" />
           <el-table-column prop="price" label="当前价格" />
           <el-table-column prop="lastPrice" label="昨日收盘价格" />
+          <el-table-column label="日涨跌幅" width="150">
+            <template #default="{ row }">
+              <span :class="priceDisplay(row).class">
+                {{ priceDisplay(row).value }}
+              </span>
+            </template>
+          </el-table-column>
           <el-table-column prop="high" label="当天最高价" />
           <el-table-column prop="low" label="当天最低价" />
           <el-table-column label="更新时间">
             <template #default="{ row }">
               {{ formatTime(row.time) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="" width="180">
+            <template #default="{ row }">
+              <el-button
+                size="small"
+                type="primary"
+                @click="viewMarketChart(row.stock_code)"
+                style="margin-right: 5px;"
+              >
+                查看行情
+              </el-button>
+              <el-button
+                size="small"
+                :type="favoriteStocks.some(s => s.stock_code === row.stock_code) ? 'danger' : 'primary'"
+                @click="toggleFavorite(row)"
+              >
+                {{ favoriteStocks.some(s => s.stock_code === row.stock_code) ? '取消自选' : '添加自选' }}
+              </el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -322,8 +371,16 @@ onMounted(() => {
               </span>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="100">
+          <el-table-column label="操作" width="200">
             <template #default="{ row }">
+              <el-button
+                size="small"
+                type="primary"
+                @click="viewMarketChart(row.stock_code)"
+                style="margin-right: 5px;"
+              >
+                查看行情
+              </el-button>
               <el-button
                 size="small"
                 :type="favoriteStocks.some(s => s.stock_code === row.stock_code) ? 'danger' : 'primary'"
@@ -355,7 +412,7 @@ onMounted(() => {
           </div>
         </template>
         <el-table :data="favoriteStocks" height="400" style="width: 100%" empty-text="暂无收藏股票">
-          <el-table-column prop="stock_code" label="代码" width="120" />
+          <el-table-column prop="stock_code" label="代码" width="80" />
           <el-table-column prop="name" label="名称" />
           <el-table-column prop="price" label="最新价格" width="120" />
           <el-table-column label="日涨跌幅" width="150">
@@ -365,10 +422,22 @@ onMounted(() => {
               </span>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="100">
+          <el-table-column label="操作" width="200">
             <template #default="{ row }">
-              <el-button size="small" type="danger" @click="toggleFavorite(row)">
-                取消自选
+              <el-button
+                size="small"
+                type="primary"
+                @click="viewMarketChart(row.stock_code)"
+                style="margin-right: 5px;"
+              >
+                查看行情
+              </el-button>
+              <el-button
+                size="small"
+                :type="favoriteStocks.some(s => s.stock_code === row.stock_code) ? 'danger' : 'primary'"
+                @click="toggleFavorite(row)"
+              >
+                {{ favoriteStocks.some(s => s.stock_code === row.stock_code) ? '取消自选' : '添加自选' }}
               </el-button>
             </template>
           </el-table-column>
