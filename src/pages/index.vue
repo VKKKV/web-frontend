@@ -5,13 +5,9 @@ import {
   InfoFilled,
   ShoppingCart,
 } from '@element-plus/icons-vue'
-import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-
-const token = localStorage.getItem('token')
-const isLoggedIn = !!token
 
 // 跳转到实时行情页面 (Market)
 function goToMarketPage() {
@@ -60,32 +56,29 @@ const features = [
     route: goToTradePage,
   },
 ]
-
-onMounted(() => {
-  if (!isLoggedIn) {
-    // Avoid redirect loop if already on or navigating to Register page.
-    if (router.currentRoute.value.path !== '/Login') {
-      goToLogin()
-    }
-  }
-})
 </script>
 
 <template>
-  <div class="stock-home text-white">
+  <div class="stock-home">
     <!-- Hero Section -->
-    <section class="relative from-blue-600 to-indigo-700 bg-gradient-to-r py-10 text-white sm:py-14">
+    <section class="relative from-blue-600 to-indigo-700 bg-gradient-to-r py-10 sm:py-14">
       <div class="mx-auto max-w-7xl px-6 lg:px-8">
         <div class="mx-auto max-w-2xl text-center space-y-3">
-          <h1 class="text-2xl font-bold tracking-tight sm:text-3xl">
+          <h1 class="text-2xl text-white font-bold tracking-tight sm:text-3xl">
             专业的股票交易平台
           </h1>
-          <p class="text-sm leading-5 opacity-90">
+          <p class="text-sm text-white leading-5 opacity-90">
             安全、高效、专业的交易体验，助您把握每一次市场机会。
           </p>
-          <div class="pt-3">
+          <div class="pt-3 space-x-2">
             <el-button type="primary" size="large" @click="goToMarketPage">
               开始交易
+              <el-icon class="ml-2">
+                <ArrowRight />
+              </el-icon>
+            </el-button>
+            <el-button type="success" size="large" @click="goToLogin">
+              立即注册
               <el-icon class="ml-2">
                 <ArrowRight />
               </el-icon>
@@ -108,11 +101,11 @@ onMounted(() => {
         </div>
         <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
           <el-card
-              v-for="(feature, index) in features"
-              :key="index"
-              shadow="hover"
-              class="feature-card border-t-4"
-              :style="{ borderTopColor: feature.color.replace('text-', '').split('-')[0] }"
+            v-for="(feature, index) in features"
+            :key="index"
+            shadow="hover"
+            class="feature-card border-t-4"
+            :style="{ borderTopColor: feature.color.replace('text-', '').split('-')[0] }"
           >
             <template #header>
               <div class="flex items-center">
@@ -122,7 +115,7 @@ onMounted(() => {
                 </h3>
               </div>
             </template>
-            <p class="mb-6 ">
+            <p class="mb-6">
               {{ feature.description }}
             </p>
             <div class="text-right">

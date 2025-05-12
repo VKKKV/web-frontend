@@ -84,7 +84,8 @@ onMounted(() => {
 
 <template>
   <div class="login-container min-h-screen flex items-center justify-center">
-    <div class="login-box max-w-md w-full border border-gray-700 rounded-lg bg-gray-800 p-8 shadow-xl">
+<!--    <div class="login-box max-w-md w-full border border-gray-700 rounded-lg bg-gray-800 p-8 shadow-xl">-->
+    <div class="login-box max-w-md w-full border border-gray-700 rounded-lg p-8 shadow-xl">
       <div class="mb-8 text-center">
         <h2 class="text-3xl text-white font-bold">
           StockVision
@@ -118,13 +119,6 @@ onMounted(() => {
             show-password
           />
         </el-form-item>
-
-<!--        <div class="mb-6 flex items-center justify-between">-->
-<!--          <el-checkbox label="记住我" />-->
-<!--          <el-button type="text" class="text-blue-400 hover:text-blue-500">-->
-<!--            忘记密码？-->
-<!--          </el-button>-->
-<!--        </div>-->
 
         <el-button
           type="primary"
