@@ -51,7 +51,7 @@ function handleUserClick() {
       <el-icon>
         <info-filled />
       </el-icon>
-      <span>股票信息</span>
+      <span>行情数据</span>
     </el-menu-item>
 
     <el-menu-item index="/nav/Trade">

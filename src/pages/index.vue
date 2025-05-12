@@ -5,9 +5,13 @@ import {
   InfoFilled,
   ShoppingCart,
 } from '@element-plus/icons-vue'
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
+
+const token = localStorage.getItem('token')
+const isLoggedIn = !!token
 
 // 跳转到实时行情页面 (Market)
 function goToMarketPage() {
@@ -41,37 +45,46 @@ const features = [
   },
   {
     icon: InfoFilled,
-    title: '股票信息',
-    description: '全面的股票基本信息和公司概况',
-    action: '查看信息',
+    title: '行情数据',
+    description: '全面的股票行情数据',
+    action: '查看数据',
     color: 'text-purple-500',
     route: goToMarketDataPage,
   },
   {
     icon: ShoppingCart,
     title: '便捷交易',
-    description: '一键下单，快速执行交易策略',
+    description: '一键下单，快速执行交易',
     action: '立即交易',
     color: 'text-green-500',
     route: goToTradePage,
   },
 ]
+
+onMounted(() => {
+  if (!isLoggedIn) {
+    // Avoid redirect loop if already on or navigating to Register page.
+    if (router.currentRoute.value.path !== '/Login') {
+      goToLogin()
+    }
+  }
+})
 </script>
 
 <template>
   <div class="stock-home text-white">
     <!-- Hero Section -->
-    <section class="relative from-blue-600 to-indigo-700 bg-gradient-to-r py-24 text-white lg:py-40 sm:py-32">
+    <section class="relative from-blue-600 to-indigo-700 bg-gradient-to-r py-10 text-white sm:py-14">
       <div class="mx-auto max-w-7xl px-6 lg:px-8">
-        <div class="mx-auto max-w-2xl text-center">
-          <h1 class="text-4xl font-bold tracking-tight sm:text-6xl">
+        <div class="mx-auto max-w-2xl text-center space-y-3">
+          <h1 class="text-2xl font-bold tracking-tight sm:text-3xl">
             专业的股票交易平台
           </h1>
-          <p class="mt-6 text-lg leading-8 opacity-90">
+          <p class="text-sm leading-5 opacity-90">
             安全、高效、专业的交易体验，助您把握每一次市场机会。
           </p>
-          <div class="mt-10">
-            <el-button type="primary" size="large" @click="goToTradePage">
+          <div class="pt-3">
+            <el-button type="primary" size="large" @click="goToMarketPage">
               开始交易
               <el-icon class="ml-2">
                 <ArrowRight />
@@ -83,23 +96,23 @@ const features = [
     </section>
 
     <!-- Features Section -->
-    <section class="py-16 sm:py-24">
+    <section class="py-12 sm:py-16">
       <div class="mx-auto max-w-7xl px-6 lg:px-8">
-        <div class="mx-auto mb-12 max-w-2xl text-center lg:mb-16">
-          <h2 class="text-3xl  font-bold tracking-tight sm:text-4xl">
+        <div class="mx-auto mb-8 max-w-2xl text-center lg:mb-12">
+          <h2 class="text-2xl font-bold tracking-tight sm:text-3xl">
             核心功能
           </h2>
-          <p class="mt-4 text-lg leading-8">
+          <p class="mt-2 text-base leading-7">
             探索我们平台提供的强大功能，助您在市场中领先一步。
           </p>
         </div>
-        <div class="grid grid-cols-1 gap-8 md:grid-cols-3">
+        <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
           <el-card
-            v-for="(feature, index) in features"
-            :key="index"
-            shadow="hover"
-            class="feature-card border-t-4"
-            :style="{ borderTopColor: feature.color.replace('text-', '').split('-')[0] }"
+              v-for="(feature, index) in features"
+              :key="index"
+              shadow="hover"
+              class="feature-card border-t-4"
+              :style="{ borderTopColor: feature.color.replace('text-', '').split('-')[0] }"
           >
             <template #header>
               <div class="flex items-center">
@@ -126,17 +139,17 @@ const features = [
     </section>
 
     <!-- Platform Introduction Section -->
-    <section class="py-16 sm:py-24">
+    <section class="py-12 sm:py-16">
       <div class="mx-auto max-w-7xl px-6 lg:px-8">
-        <div class="grid grid-cols-1 items-center gap-12 md:grid-cols-2">
+        <div class="grid grid-cols-1 items-center gap-10 md:grid-cols-2">
           <div>
-            <h2 class="text-3xl  font-bold tracking-tight sm:text-4xl">
+            <h2 class="text-2xl font-bold tracking-tight sm:text-3xl">
               为什么选择 StockVision
             </h2>
-            <p class="mt-6 text-lg leading-8">
+            <p class="mt-4 text-base leading-7">
               StockVision 致力于为投资者提供安全、高效、专业的交易体验。我们的平台采用先进的技术架构，提供毫秒级的行情推送和交易执行，助您把握每一次市场机遇。
             </p>
-            <ul class="mt-8 space-y-4">
+            <ul class="mt-6 space-y-3">
               <li class="flex items-start">
                 <el-icon class="mr-2 mt-1 h-5 w-5 flex-shrink-0 text-blue-600">
                   <DataLine />
@@ -153,9 +166,9 @@ const features = [
           </div>
           <div class="flex justify-center">
             <img
+              class="max-w-md w-full rounded-lg object-cover shadow-xl"
               src="https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
               alt="Trading Platform Visualization"
-              class="max-w-md w-full rounded-lg object-cover shadow-xl"
             >
           </div>
         </div>
@@ -163,15 +176,15 @@ const features = [
     </section>
 
     <!-- Call to Action Section -->
-    <section class="from-blue-600 to-indigo-700 bg-gradient-to-r py-16 text-white sm:py-24">
+    <section class="from-blue-600 to-indigo-700 bg-gradient-to-r py-12 text-white sm:py-16">
       <div class="mx-auto max-w-7xl px-6 text-center lg:px-8">
-        <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">
+        <h2 class="text-2xl font-bold tracking-tight sm:text-3xl">
           准备好开始交易了吗？
         </h2>
-        <p class="mx-auto mt-6 max-w-2xl text-lg leading-8 opacity-90">
+        <p class="mx-auto mt-4 max-w-2xl text-base leading-7 opacity-90">
           立即加入 StockVision，体验专业的交易工具和实时行情，把握市场机遇。
         </p>
-        <div class="mt-10">
+        <div class="mt-8">
           <el-button type="primary" size="large" @click="goToTradePage">
             立即开始
             <el-icon class="ml-2">
@@ -183,7 +196,7 @@ const features = [
     </section>
 
     <!-- Footer -->
-    <footer class="border-t  py-8">
+    <footer class="border-t py-6">
       <div class="mx-auto max-w-7xl px-6 text-center text-gray-600 lg:px-8">
         <p class="text-sm leading-6">
           &copy; {{ new Date().getFullYear() }} StockVision. 保留所有权利。
@@ -196,21 +209,33 @@ const features = [
   </div>
 </template>
 
-<style scoped>
-.stock-home {
-  min-height: 100vh;
+  <style scoped>
+    .stock-home {
+  /* 改为自动高度 */
+  min-height: auto;
   display: flex;
   flex-direction: column;
 }
 
-/* 为卡片添加边框颜色 */
 .feature-card {
-  border-top-width: 4px;
-  border-top-style: solid;
+  /* 减小卡片的悬停移动距离 */
+  transition:
+    transform 0.2s ease-in-out,
+    box-shadow 0.2s ease-in-out;
 }
 
-/* 确保图片在特定部分表现良好 */
+.feature-card:hover {
+  transform: translateY(-3px);
+}
+
 section img {
-  aspect-ratio: 16 / 10;
+  /* 调整图片比例 */
+  aspect-ratio: 16 / 9;
+  max-height: 400px;
+}
+
+.footer {
+  /* 确保footer不会有过大间距 */
+  margin-top: auto;
 }
 </style>
