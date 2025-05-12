@@ -4,7 +4,7 @@ import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuth } from '../../composables/useAuth'
+import { useAuth } from '~/composables/useAuth'
 
 const { logout } = useAuth()
 

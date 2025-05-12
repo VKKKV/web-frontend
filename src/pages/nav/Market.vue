@@ -24,7 +24,7 @@ const isConnected = ref(false) // 添加连接状态变量
 const useTestData = ref(true) // 是否使用测试数据
 const searchInput = ref('') // 搜索输入
 const isLoadingStocks = ref(false) // 加载股票列表状态
-const currentChartType = ref('time') // 默认显示日K
+const currentChartType = ref('day') // 默认显示日K
 const chartLoading = ref(false)
 const chartError = ref(false)
 const styles = {
@@ -505,13 +505,6 @@ const styles = {
 const currentStockName = ref()
 const currentStockCode = ref()
 const klineLoading = ref(false)
-const chartTypeLabels = {
-  'time': '分时',
-  'day': '日K',
-  '5day': '五日K',
-  'week': '周K',
-  'year': '年K',
-}
 let reconnectAttempts = 0
 let reconnectTimer = null
 let initialData = []
@@ -621,6 +614,7 @@ const handleCodeInput = debounce(async (value) => {
       currentStockName.value = await fetchStockName(currentStockCode.value)
     }
     await loadChartData()
+    await fetchStocks()
   }
   catch (err) {
     ElMessage.error(`加载失败: ${err.message}`)
@@ -635,6 +629,39 @@ function sanitizeName(name) {
   if (!name)
     return ''
   return name.replace(/[<>&"']/g, '') // 过滤特殊字符防止XSS
+}
+
+const realtimeData = ref([])
+
+// 安全类型转换
+// 数据清洗与转换
+const safeParseFloat = v => Number.isFinite(+v) ? +v : 0
+const safeParseInt = v => Math.abs(Number.parseInt(v)) || 0
+
+async function fetchStocks() {
+  if (!searchInput.value.trim())
+    return
+  try {
+    const response = await axios.get(
+      `http://localhost:8080/api/v1/market/getstock/${searchInput.value}`,
+    )
+    console.error(response)
+    // 对API返回的数据进行转换，以确保字段统一和数据类型正确
+    realtimeData.value = response.data.map(stock => ({
+      ...stock, // 保留原始API返回的其他字段
+      stock_code: stock.stockCode, // 将 stockCode 映射为 stock_code
+      name: stock.name, // 确保 name 字段存在
+      price: safeParseFloat(stock.price),
+      lastPrice: safeParseFloat(stock.lastPrice),
+      openPrice: safeParseFloat(stock.openPrice),
+      high: safeParseFloat(stock.high),
+      low: safeParseFloat(stock.low),
+      volume: safeParseInt(stock.amount),
+    }))
+  }
+  catch (err) {
+    ElMessage.error(err.response?.data || '服务异常')
+  }
 }
 
 async function fetchStockName(stockCode) {
@@ -1138,10 +1165,8 @@ function initChart() {
     return
   }
   chart.value = init('chart-container')
-  // chart.value.setStyles(styles) // 样式将在 loadChartData 中根据类型动态设置
   const emptyInitialData = [] // 初始化时使用空数据，由 loadChartData 加载
   chart.value.applyNewData(emptyInitialData)
-  // chart.value.setPriceVolumePrecision(2, 0) // 设置价格小数位和成交量小数位 (根据实际需要调整)
 }
 
 // 从URL参数获取股票代码
@@ -1171,6 +1196,7 @@ onMounted(async () => {
 
   initChart()
   await loadChartData() // 加载默认或URL指定的股票数据
+  await fetchStocks()
   // 创建WebSocket连接
   // createWebSocketConnection()
 })
@@ -1272,9 +1298,7 @@ async function switchToHSI() {
             年K
           </el-menu-item>
         </el-menu>
-        <div class="chart-title text-xl font-bold">
-          {{ chartTypeLabels[currentChartType] }}线图
-        </div>
+        <div class="chart-title text-xl font-bold" />
         <div id="chart-container">
           <div v-if="!currentStockCode" class="chart-prompt">
             请输入股票代码加载图表
@@ -1291,26 +1315,26 @@ async function switchToHSI() {
           </div>
         </div>
       </div>
+      <el-row :gutter="20" class="mt-4">
+        <el-col :span="24">
+          <el-card>
+            <template #header>
+              <div class="font-bold">
+                实时数据
+              </div>
+            </template>
 
-<!--      <el-row :gutter="20" class="mt-4">-->
-<!--        <el-col :span="24">-->
-<!--          <el-card>-->
-<!--            <template #header>-->
-<!--              <div class="font-bold">-->
-<!--                实时数据-->
-<!--              </div>-->
-<!--            </template>-->
-<!--            <el-table :data="realtimeData" height="200">-->
-<!--              <el-table-column prop="time" label="时间" />-->
-<!--              <el-table-column prop="amount" label="成交量" />-->
-<!--              <el-table-column prop="price" label="当前价格" />-->
-<!--              <el-table-column prop="lastPrice" label="昨日收盘价格" />-->
-<!--              <el-table-column prop="high" label="当天最高价" />-->
-<!--              <el-table-column prop="low" label="当天最低价" />-->
-<!--            </el-table>-->
-<!--          </el-card>-->
-<!--        </el-col>-->
-<!--      </el-row>-->
+            <el-table :data="realtimeData" height="200">
+              <el-table-column prop="time" label="时间" />
+              <el-table-column prop="volume" label="成交量" />
+              <el-table-column prop="price" label="当前价格" />
+              <el-table-column prop="lastPrice" label="昨日收盘价格" />
+              <el-table-column prop="high" label="当天最高价" />
+              <el-table-column prop="low" label="当天最低价" />
+            </el-table>
+          </el-card>
+        </el-col>
+      </el-row>
     </div>
   </div>
 </template>
