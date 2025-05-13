@@ -3,13 +3,13 @@
  * 导出所有 API 请求方法
  */
 
-import { get, post, put, del } from './request'
+import { del, get, post, put } from './request'
 
 export {
+  del,
   get,
   post,
-  put,
-  del
+  put
 }
 
 export default {
