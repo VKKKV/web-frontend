@@ -9,6 +9,7 @@ import { ElMessage } from 'element-plus'
 import { dispose, init } from 'klinecharts'
 import { onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { chartStyles } from '~/composables/chartStyles'
 // 扩展插件（只需要执行一次）
 dayjsBase.extend(isoWeek)
 dayjsBase.extend(isoWeekYear)
@@ -20,494 +21,19 @@ const route = useRoute()
 const chart = shallowRef(null)
 const ws = shallowRef(null)
 const selectedSymbol = ref('00001') // 当前展示的股票代码
-const isConnected = ref(false) // 添加连接状态变量
-const useTestData = ref(true) // 是否使用测试数据
 const searchInput = ref('') // 搜索输入
 const isLoadingStocks = ref(false) // 加载股票列表状态
 const currentChartType = ref('day') // 默认显示日K
 const chartLoading = ref(false)
 const chartError = ref(false)
-const styles = {
-  grid: {
-    show: true,
-    horizontal: {
-      show: true,
-      size: 1,
-      color: '#EDEDED',
-      style: 'dashed',
-      dashedValue: [2, 2],
-    },
-    vertical: {
-      show: true,
-      size: 1,
-      color: '#EDEDED',
-      style: 'dashed',
-      dashedValue: [2, 2],
-    },
-  },
-  candle: {
-    // 'candle_solid' | 'candle_stroke' | 'candle_up_stroke' | 'candle_down_stroke' | 'ohlc' | 'area'
-    type: 'candle_solid',
-    bar: {
-      // 'current_open' | 'previous_close'
-      compareRule: 'current_open',
-      upColor: '#2DC08E',
-      downColor: '#F92855',
-      noChangeColor: '#888888',
-      upBorderColor: '#2DC08E',
-      downBorderColor: '#F92855',
-      noChangeBorderColor: '#888888',
-      upWickColor: '#2DC08E',
-      downWickColor: '#F92855',
-      noChangeWickColor: '#888888',
-    },
-    area: {
-      lineSize: 2,
-      lineColor: '#2196F3',
-      smooth: false,
-      value: 'close',
-      backgroundColor: [{
-        offset: 0,
-        color: 'rgba(33, 150, 243, 0.01)',
-      }, {
-        offset: 1,
-        color: 'rgba(33, 150, 243, 0.2)',
-      }],
-      point: {
-        show: true,
-        color: '#2196F3',
-        radius: 4,
-        rippleColor: 'rgba(33, 150, 243, 0.3)',
-        rippleRadius: 8,
-        animation: true,
-        animationDuration: 1000,
-      },
-    },
-    priceMark: {
-      show: true,
-      high: {
-        show: true,
-        color: '#D9D9D9',
-        textMargin: 5,
-        textSize: 10,
-        textFamily: 'Helvetica Neue',
-        textWeight: 'normal',
-      },
-      low: {
-        show: true,
-        color: '#D9D9D9',
-        textMargin: 5,
-        textSize: 10,
-        textFamily: 'Helvetica Neue',
-        textWeight: 'normal',
-      },
-      last: {
-        show: true,
-        // 'current_open' | 'previous_close'
-        compareRule: 'current_open',
-        upColor: '#2DC08E',
-        downColor: '#F92855',
-        noChangeColor: '#888888',
-        line: {
-          show: true,
-          // 'solid' | 'dashed'
-          style: 'dashed',
-          dashedValue: [4, 4],
-          size: 1,
-        },
-        text: {
-          show: true,
-          // 'fill' | 'stroke' | 'stroke_fill'
-          style: 'fill',
-          size: 12,
-          paddingLeft: 4,
-          paddingTop: 4,
-          paddingRight: 4,
-          paddingBottom: 4,
-          // 'solid' | 'dashed'
-          borderStyle: 'solid',
-          borderSize: 0,
-          borderColor: 'transparent',
-          borderDashedValue: [2, 2],
-          color: '#FFFFFF',
-          family: 'Helvetica Neue',
-          weight: 'normal',
-          borderRadius: 2,
-        },
-      },
-    },
-    tooltip: {
-      offsetLeft: 4,
-      offsetTop: 6,
-      offsetRight: 4,
-      offsetBottom: 6,
-      // 'always' | 'follow_cross' | 'none'
-      showRule: 'always',
-      // 'standard' | 'rect'
-      showType: 'standard',
-      // e.g.
-      // [{ title: 'time', value: '{time}' }, { title: 'close', value: '{close}' }]
-      // [{ title: { text: 'time', color: '#fff' }, value: { text: '{time}', color: '#fff' } }, { title: 'close', value: '{close}' }]
-      custom: [
-        { title: 'time', value: '{time}' },
-        { title: 'open', value: '{open}' },
-        { title: 'high', value: '{high}' },
-        { title: 'low', value: '{low}' },
-        { title: 'close', value: '{close}' },
-        { title: 'volume', value: '{volume}' },
-      ],
-      defaultValue: 'n/a',
-      rect: {
-        // 'fixed' | 'pointer'
-        position: 'fixed',
-        paddingLeft: 4,
-        paddingRight: 4,
-        paddingTop: 4,
-        paddingBottom: 4,
-        offsetLeft: 4,
-        offsetTop: 4,
-        offsetRight: 4,
-        offsetBottom: 4,
-        borderRadius: 4,
-        borderSize: 1,
-        borderColor: '#f2f3f5',
-        color: '#FEFEFE',
-      },
-      text: {
-        size: 12,
-        family: 'Helvetica Neue',
-        weight: 'normal',
-        color: '#D9D9D9',
-        marginLeft: 8,
-        marginTop: 4,
-        marginRight: 8,
-        marginBottom: 4,
-      },
-    },
-  },
-  indicator: {
-    ohlc: {
-      // 'current_open' | 'previous_close'
-      compareRule: 'current_open',
-      upColor: 'rgba(45, 192, 142, .7)',
-      downColor: 'rgba(249, 40, 85, .7)',
-      noChangeColor: '#888888',
-    },
-    bars: [{
-      // 'fill' | 'stroke' | 'stroke_fill'
-      style: 'fill',
-      // 'solid' | 'dashed'
-      borderStyle: 'solid',
-      borderSize: 1,
-      borderDashedValue: [2, 2],
-      upColor: 'rgba(45, 192, 142, .7)',
-      downColor: 'rgba(249, 40, 85, .7)',
-      noChangeColor: '#888888',
-    }],
-    lines: [
-      {
-        // 'solid' | 'dashed'
-        style: 'solid',
-        smooth: false,
-        size: 1,
-        dashedValue: [2, 2],
-        color: '#FF9600',
-      },
-      {
-        style: 'solid',
-        smooth: false,
-        size: 1,
-        dashedValue: [2, 2],
-        color: '#935EBD',
-      },
-      {
-        style: 'solid',
-        smooth: false,
-        size: 1,
-        dashedValue: [2, 2],
-        color: '#2196F3',
-      },
-      {
-        style: 'solid',
-        smooth: false,
-        size: 1,
-        dashedValue: [2, 2],
-        color: '#E11D74',
-      },
-      {
-        style: 'solid',
-        smooth: false,
-        size: 1,
-        dashedValue: [2, 2],
-        color: '#01C5C4',
-      },
-    ],
-    circles: [{
-      // 'fill' | 'stroke' | 'stroke_fill'
-      style: 'fill',
-      // 'solid' | 'dashed'
-      borderStyle: 'solid',
-      borderSize: 1,
-      borderDashedValue: [2, 2],
-      upColor: 'rgba(45, 192, 142, .7)',
-      downColor: 'rgba(249, 40, 85, .7)',
-      noChangeColor: '#888888',
-    }],
-    lastValueMark: {
-      show: false,
-      text: {
-        show: false,
-        // 'fill' | 'stroke' | 'stroke_fill'
-        style: 'fill',
-        color: '#FFFFFF',
-        size: 12,
-        family: 'Helvetica Neue',
-        weight: 'normal',
-        // 'solid' | 'dashed'
-        borderStyle: 'solid',
-        borderSize: 1,
-        borderDashedValue: [2, 2],
-        paddingLeft: 4,
-        paddingTop: 4,
-        paddingRight: 4,
-        paddingBottom: 4,
-        borderRadius: 2,
-      },
-    },
-    tooltip: {
-      offsetLeft: 4,
-      offsetTop: 6,
-      offsetRight: 4,
-      offsetBottom: 6,
-      // 'always' | 'follow_cross' | 'none'
-      showRule: 'always',
-      // 'standard' | 'rect'
-      showType: 'standard',
-      showName: true,
-      showParams: true,
-      defaultValue: 'n/a',
-      text: {
-        size: 12,
-        family: 'Helvetica Neue',
-        weight: 'normal',
-        color: '#D9D9D9',
-        marginTop: 4,
-        marginRight: 8,
-        marginBottom: 4,
-        marginLeft: 8,
-      },
-      features: [],
-    },
-  },
-  xAxis: {
-    show: true,
-    size: 'auto',
-    axisLine: {
-      show: true,
-      color: '#888888',
-      size: 1,
-    },
-    tickText: {
-      show: true,
-      color: '#D9D9D9',
-      family: 'Helvetica Neue',
-      weight: 'normal',
-      size: 12,
-      marginStart: 4,
-      marginEnd: 4,
-    },
-    tickLine: {
-      show: true,
-      size: 1,
-      length: 3,
-      color: '#888888',
-    },
-  },
-  yAxis: {
-    show: true,
-    size: 'auto',
-    // 'left' | 'right'
-    position: 'right',
-    // 'normal' | 'percentage' | 'log'
-    type: 'normal',
-    inside: false,
-    reverse: false,
-    axisLine: {
-      show: true,
-      color: '#888888',
-      size: 1,
-    },
-    tickText: {
-      show: true,
-      color: '#D9D9D9',
-      family: 'Helvetica Neue',
-      weight: 'normal',
-      size: 12,
-      marginStart: 4,
-      marginEnd: 4,
-    },
-    tickLine: {
-      show: true,
-      size: 1,
-      length: 3,
-      color: '#888888',
-    },
-  },
-  separator: {
-    size: 1,
-    color: '#888888',
-    fill: true,
-    activeBackgroundColor: 'rgba(230, 230, 230, .15)',
-  },
-  crosshair: {
-    show: true,
-    horizontal: {
-      show: true,
-      line: {
-        show: true,
-        // 'solid' | 'dashed'
-        style: 'dashed',
-        dashedValue: [4, 2],
-        size: 1,
-        color: '#888888',
-      },
-      text: {
-        show: true,
-        // 'fill' | 'stroke' | 'stroke_fill'
-        style: 'fill',
-        color: '#FFFFFF',
-        size: 12,
-        family: 'Helvetica Neue',
-        weight: 'normal',
-        // 'solid' | 'dashed'
-        borderStyle: 'solid',
-        borderDashedValue: [2, 2],
-        borderSize: 1,
-        borderColor: '#686D76',
-        borderRadius: 2,
-        paddingLeft: 4,
-        paddingRight: 4,
-        paddingTop: 4,
-        paddingBottom: 4,
-        backgroundColor: '#686D76',
-      },
-    },
-    vertical: {
-      show: true,
-      line: {
-        show: true,
-        // 'solid'|'dashed'
-        style: 'dashed',
-        dashedValue: [4, 2],
-        size: 1,
-        color: '#888888',
-      },
-      text: {
-        show: true,
-        // 'fill' | 'stroke' | 'stroke_fill'
-        style: 'fill',
-        color: '#FFFFFF',
-        size: 12,
-        family: 'Helvetica Neue',
-        weight: 'normal',
-        // 'solid' | 'dashed'
-        borderStyle: 'solid',
-        borderDashedValue: [2, 2],
-        borderSize: 1,
-        borderColor: '#686D76',
-        borderRadius: 2,
-        paddingLeft: 4,
-        paddingRight: 4,
-        paddingTop: 4,
-        paddingBottom: 4,
-        backgroundColor: '#686D76',
-      },
-    },
-  },
-  overlay: {
-    point: {
-      color: '#1677FF',
-      borderColor: 'rgba(22, 119, 255, 0.35)',
-      borderSize: 1,
-      radius: 5,
-      activeColor: '#1677FF',
-      activeBorderColor: 'rgba(22, 119, 255, 0.35)',
-      activeBorderSize: 3,
-      activeRadius: 5,
-    },
-    line: {
-      // 'solid' | 'dashed'
-      style: 'solid',
-      smooth: false,
-      color: '#1677FF',
-      size: 1,
-      dashedValue: [2, 2],
-    },
-    rect: {
-      // 'fill' | 'stroke' | 'stroke_fill'
-      style: 'fill',
-      color: 'rgba(22, 119, 255, 0.25)',
-      borderColor: '#1677FF',
-      borderSize: 1,
-      borderRadius: 0,
-      // 'solid' | 'dashed'
-      borderStyle: 'solid',
-      borderDashedValue: [2, 2],
-    },
-    polygon: {
-      // 'fill' | 'stroke' | 'stroke_fill'
-      style: 'fill',
-      color: '#1677FF',
-      borderColor: '#1677FF',
-      borderSize: 1,
-      // 'solid' | 'dashed'
-      borderStyle: 'solid',
-      borderDashedValue: [2, 2],
-    },
-    circle: {
-      // 'fill' | 'stroke' | 'stroke_fill'
-      style: 'fill',
-      color: 'rgba(22, 119, 255, 0.25)',
-      borderColor: '#1677FF',
-      borderSize: 1,
-      // 'solid' | 'dashed'
-      borderStyle: 'solid',
-      borderDashedValue: [2, 2],
-    },
-    arc: {
-      // 'solid' | 'dashed'
-      style: 'solid',
-      color: '#1677FF',
-      size: 1,
-      dashedValue: [2, 2],
-    },
-    text: {
-      // 'fill' | 'stroke' | 'stroke_fill'
-      style: 'fill',
-      color: '#FFFFFF',
-      size: 12,
-      family: 'Helvetica Neue',
-      weight: 'normal',
-      // 'solid' | 'dashed'
-      borderStyle: 'solid',
-      borderDashedValue: [2, 2],
-      borderSize: 0,
-      borderRadius: 2,
-      borderColor: '#1677FF',
-      paddingLeft: 0,
-      paddingRight: 0,
-      paddingTop: 0,
-      paddingBottom: 0,
-      backgroundColor: '#1677FF',
-    },
-  },
-}
 const currentStockName = ref()
 const currentStockCode = ref()
 const klineLoading = ref(false)
-let reconnectAttempts = 0
-let reconnectTimer = null
+const styles = chartStyles
 let initialData = []
+const realtimeData = ref([])
+const wsReconnectDelay = 5000 // 5 seconds for reconnection attempts
+let wsReconnectTimer = null
 
 // 安全数值转换逻辑
 function safeParse(value) {
@@ -631,8 +157,6 @@ function sanitizeName(name) {
   return name.replace(/[<>&"']/g, '') // 过滤特殊字符防止XSS
 }
 
-const realtimeData = ref([])
-
 // 安全类型转换
 // 数据清洗与转换
 const safeParseFloat = v => Number.isFinite(+v) ? +v : 0
@@ -657,6 +181,7 @@ async function fetchStocks() {
       high: safeParseFloat(stock.high),
       low: safeParseFloat(stock.low),
       volume: safeParseInt(stock.amount),
+      time: stock.time, // Assuming backend sends time
     }))
   }
   catch (err) {
@@ -962,201 +487,6 @@ async function fetchYearKLine(stockCode) {
   return yearData
 }
 
-// 搜索过滤
-function filterStocks(queryString) {
-  if (queryString) {
-    const lowercaseQuery = queryString.toLowerCase()
-    return stockOptions.value.filter(
-      stock => stock.value.toLowerCase().includes(lowercaseQuery)
-        || stock.label.toLowerCase().includes(lowercaseQuery)
-        || (stock.value && stock.value.toLowerCase().includes(lowercaseQuery))
-        || (stock.market && stock.market.toLowerCase().includes(lowercaseQuery)),
-    )
-  }
-  return stockOptions.value
-}
-
-// 处理搜索结果
-function handleSelect(item) {
-  if (typeof item === 'string') {
-    // 如果直接输入了股票代码
-    const stock = stockOptions.value.find(s => s.value === item.toUpperCase())
-    if (stock) {
-      switchStock(stock.value)
-    }
-  }
-  else {
-    // 如果选择了下拉菜单中的项目
-    switchStock(item.value)
-  }
-  searchInput.value = '' // 清空搜索框
-}
-
-// 远程搜索处理
-function querySearch(queryString, cb) {
-  const results = filterStocks(queryString)
-  cb(results)
-}
-
-// 创建WebSocket连接
-function createWebSocketConnection() {
-  try {
-    // 关闭现有连接
-    if (ws.value && ws.value.readyState !== WebSocket.CLOSED) {
-      ws.value.close()
-    }
-    // 创建新连接
-    ws.value = new WebSocket(`ws://${window.location.host}/ws/v1/market/subscribe`)
-
-    // 二进制传输格式
-    ws.value.binaryType = 'arraybuffer'
-
-    ws.value.onopen = () => {
-      ElMessage.info('WebSocket连接已建立')
-      isConnected.value = true
-      reconnectAttempts = 0 // 重置重连计数
-
-      // 增加心跳检测机制
-      setInterval(() => {
-        if (ws.value && ws.value.readyState === WebSocket.OPEN) {
-          ws.value.send(JSON.stringify({ type: 'ping' }))
-        }
-      }, 30000)
-
-      // 设置数据模式
-      setDataMode(useTestData.value)
-
-      // 订阅股票数据
-      subscribeToStock(selectedSymbol.value)
-    }
-
-    ws.value.onmessage = ({ data }) => {
-      try {
-        let payload
-
-        // 处理不同类型的数据
-        if (data instanceof ArrayBuffer) {
-          const decoder = new TextDecoder()
-          const jsonStr = decoder.decode(data)
-          payload = JSON.parse(jsonStr)
-        }
-        else {
-          payload = JSON.parse(data)
-        }
-
-        // 只处理当前选中的股票
-        const targetData = payload[selectedSymbol.value]
-        if (!targetData)
-          return
-
-        // 更新图表数据
-        updateChartData({
-          timestamp: targetData.timestamp,
-          open: +targetData.open.toFixed(2),
-          close: +targetData.close.toFixed(2),
-          high: +targetData.high.toFixed(2),
-          low: +targetData.low.toFixed(2),
-          volume: targetData.volume,
-        })
-        // 更新实时数据表格
-        realtimeData.value.unshift({
-          time: new Date(targetData.timestamp).toLocaleTimeString(),
-          price: targetData.close.toFixed(2),
-          volume: targetData.volume,
-        })
-        // 限制表格数据量
-        if (realtimeData.value.length > 10) {
-          realtimeData.value = realtimeData.value.slice(0, 10)
-        }
-      }
-      catch (error) {
-        ElMessage.error('处理WebSocket消息时出错:', error)
-      }
-    }
-    ws.value.onclose = (event) => {
-      isConnected.value = false
-      // 尝试重连
-      if (reconnectAttempts < 5) {
-        const delay = Math.min(1000 * 2 ** reconnectAttempts, 30000)
-        reconnectTimer = setTimeout(() => {
-          reconnectAttempts++
-          createWebSocketConnection()
-        }, delay)
-      }
-    }
-    ws.value.onerror = (error) => {
-      ElMessage.error('WebSocket错误:', error)
-    }
-  }
-  catch (error) {
-    ElMessage.error('创建WebSocket连接时出错:', error)
-  }
-}
-
-// 设置数据模式
-function setDataMode(useTestData) {
-  if (ws.value && ws.value.readyState === WebSocket.OPEN) {
-    const message = {
-      action: 'setDataMode',
-      useTestData,
-    }
-    ws.value.send(JSON.stringify(message))
-  }
-}
-
-// 订阅股票数据
-function subscribeToStock(symbol) {
-  if (ws.value && ws.value.readyState === WebSocket.OPEN) {
-    const subscription = {
-      action: 'subscribe',
-      stock_codes: [symbol],
-    }
-    ws.value.send(JSON.stringify(subscription))
-  }
-}
-
-// 切换股票时的处理
-function switchStock(symbol) {
-  if (symbol === selectedSymbol.value)
-    return
-
-  selectedSymbol.value = symbol
-  // 清空当前数据
-  realtimeData.value = []
-
-  // 重新初始化图表
-  dispose('chart-container')
-  setTimeout(() => {
-    initChart()
-  }, 100)
-
-  if (ws.value && ws.value.readyState === WebSocket.OPEN) {
-    // 取消订阅当前股票
-    const msg = {
-      action: 'unsubscribe',
-      stock_codes: [selectedSymbol.value],
-    }
-    ws.value.send(JSON.stringify(msg))
-
-    // 订阅新股票
-    subscribeToStock(symbol)
-  }
-}
-
-function updateChartData(kLine) {
-  if (!chart.value)
-    return
-
-  // 添加时区转换逻辑（根据需要）
-  const adjustedTimestamp = kLine.timestamp /* + 时区偏移量 */
-
-  chart.value.updateData({
-    ...kLine,
-    timestamp: adjustedTimestamp,
-    turnover: kLine.volume * kLine.close,
-  })
-}
-
 // 初始化图表并设置基本配置
 function initChart() {
   const container = document.getElementById('chart-container')
@@ -1167,6 +497,88 @@ function initChart() {
   chart.value = init('chart-container')
   const emptyInitialData = [] // 初始化时使用空数据，由 loadChartData 加载
   chart.value.applyNewData(emptyInitialData)
+}
+
+function connectWebSocket() {
+  if (ws.value && (ws.value.readyState === WebSocket.OPEN || ws.value.readyState === WebSocket.CONNECTING))
+    return
+
+  ws.value = new WebSocket('ws://localhost:8080/ws/v1/market/subscribe')
+
+  ws.value.onopen = () => {
+    ElMessage.success('实时数据连接成功!')
+    console.log('WebSocket connected')
+    // Clear any reconnection timer
+    if (wsReconnectTimer) {
+      clearTimeout(wsReconnectTimer)
+      wsReconnectTimer = null
+    }
+    // Subscribe to the current stock if it exists
+    if (currentStockCode.value) {
+      subscribeToStock(currentStockCode.value)
+    }
+  }
+
+  ws.value.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data)
+      // Assuming data is an array of stock objects, matching realtimeData structure
+      if (Array.isArray(data)) {
+        realtimeData.value = data
+      }
+      else {
+        console.warn('Received WebSocket data is not an array:', data)
+      }
+    }
+    catch (error) {
+      console.error('Error parsing WebSocket message:', error)
+      ElMessage.error('实时数据格式错误')
+    }
+  }
+
+  ws.value.onclose = (event) => {
+    console.log('WebSocket disconnected:', event.code, event.reason)
+    if (!event.wasClean) {
+      ElMessage.warning(`实时数据连接断开，${wsReconnectDelay / 1000}秒后尝试重连...`)
+      if (wsReconnectTimer)
+        clearTimeout(wsReconnectTimer)
+
+      wsReconnectTimer = setTimeout(() => {
+        connectWebSocket() // Attempt to reconnect
+      }, wsReconnectDelay)
+    }
+    else {
+      ElMessage.info('实时数据连接已关闭')
+    }
+  }
+
+  ws.value.onerror = (error) => {
+    console.error('WebSocket error:', error)
+    ElMessage.error('实时数据连接错误')
+    // onclose will likely be called after this, handling reconnection
+  }
+}
+
+function subscribeToStock(stockCode) {
+  if (ws.value && ws.value.readyState === WebSocket.OPEN && stockCode) {
+    const message = JSON.stringify({
+      action: 'subscribe',
+      stock_codes: [stockCode],
+    })
+    ws.value.send(message)
+    console.log('Subscribed to:', stockCode)
+  }
+}
+
+function unsubscribeFromStock(stockCode) {
+  if (ws.value && ws.value.readyState === WebSocket.OPEN && stockCode) {
+    const message = JSON.stringify({
+      action: 'unsubscribe',
+      stock_codes: [stockCode],
+    })
+    ws.value.send(message)
+    console.log('Unsubscribed from:', stockCode)
+  }
 }
 
 // 从URL参数获取股票代码
@@ -1196,29 +608,38 @@ onMounted(async () => {
 
   initChart()
   await loadChartData() // 加载默认或URL指定的股票数据
-  await fetchStocks()
-  // 创建WebSocket连接
-  // createWebSocketConnection()
+  connectWebSocket() // Connect WebSocket
+})
+
+watch(currentStockCode, async (newVal, oldVal) => {
+  if (oldVal) {
+    unsubscribeFromStock(oldVal) // Unsubscribe from old stock
+  }
+  if (newVal) {
+    subscribeToStock(newVal) // Subscribe to new stock
+    // If you want to clear realtimeData immediately on stock change:
+    realtimeData.value = []
+    // However, backend might send initial data upon subscription or periodically update.
+  }
+  // loadChartData is already called by another watcher if chart type doesn't change
+  // or handled by direct calls when necessary.
 })
 
 onUnmounted(() => {
   dispose('chart-container')
 
   // 清除重连定时器
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer)
+  if (wsReconnectTimer) {
+    clearTimeout(wsReconnectTimer)
+    wsReconnectTimer = null
   }
   // 关闭WebSocket连接
   if (ws.value) {
-    // 发送取消订阅请求
-    if (ws.value.readyState === WebSocket.OPEN) {
-      const unsubscribe = {
-        action: 'unsubscribe',
-        stock_codes: [selectedSymbol.value],
-      }
-      ws.value.send(JSON.stringify(unsubscribe))
+    // 发送取消订阅请求 for the last known stock
+    if (ws.value.readyState === WebSocket.OPEN && currentStockCode.value) {
+      unsubscribeFromStock(currentStockCode.value)
     }
-    ws.value.close()
+    ws.value.close(1000, 'Component unmounted') // Clean close
   }
 })
 
