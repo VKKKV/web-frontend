@@ -1,13 +1,13 @@
 <script setup>
 import { Lock, User } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { onMounted, reactive, ref } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { post } from '../api'
 import { useAuth } from '../composables/useAuth'
 
 const router = useRouter()
-const { setLoginInfo, redirectAfterLogin, checkAuth } = useAuth()
+const { setLoginInfo, redirectAfterLogin } = useAuth()
 
 // 登录表单数据
 const loginForm = reactive({
@@ -74,17 +74,10 @@ async function handleLogin() {
 function goToRegister() {
   router.push('/register')
 }
-
-// 页面加载时检查登录状态
-onMounted(() => {
-  // 如果已登录，则重定向到首页
-  checkAuth(false)
-})
 </script>
 
 <template>
   <div class="login-container min-h-screen flex items-center justify-center">
-<!--    <div class="login-box max-w-md w-full border border-gray-700 rounded-lg bg-gray-800 p-8 shadow-xl">-->
     <div class="login-box max-w-md w-full border border-gray-700 rounded-lg p-8 shadow-xl">
       <div class="mb-8 text-center">
         <h2 class="text-3xl  font-bold">

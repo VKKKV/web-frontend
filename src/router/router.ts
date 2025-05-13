@@ -22,11 +22,11 @@ router.beforeEach((to, from, next) => {
   // 需要登录的页面 meta 标记
   if (to.meta.requiresAuth && !isLoggedIn) {
     ElMessage.warning('请先登录')
-    return next('/Login')
+    return next('/login')
   }
 
   // 已登录时禁止访问登录/注册页
-  if ((to.path === '/Login' || to.path === '/Register') && isLoggedIn) {
+  if ((to.path === '/login' || to.path === '/register') && isLoggedIn) {
     ElMessage.warning('您已登录')
     return next('/')
   }

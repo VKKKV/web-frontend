@@ -4,8 +4,10 @@ import { ElMessage } from 'element-plus'
 // 修改pagination事件绑定（新增防抖处理）
 import { debounce } from 'lodash-es'
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router' // 引入 useRouter
+import { useRouter } from 'vue-router'
+import { useAuth } from '~/composables/useAuth.js'
 
+const { isLoggedIn } = useAuth()
 const inputCodes = ref('')
 const stockList = ref([])
 const loading = ref(false)
@@ -122,7 +124,7 @@ const safeParseInt = v => Math.abs(Number.parseInt(v)) || 0
 // 获取自选股实时数据
 async function fetchFavoriteStocks() {
   // 检查是否为空
-  if (favoriteStocks.value.length === 0) {
+  if (favoriteStocks.value.length === 0 && isLoggedIn.value) {
     ElMessage.warning('当前没有自选股票')
     return
   }
@@ -328,8 +330,8 @@ onMounted(() => {
               <el-button
                 size="small"
                 type="primary"
-                @click="viewMarketChart(row.stock_code)"
                 style="margin-right: 5px;"
+                @click="viewMarketChart(row.stock_code)"
               >
                 查看行情
               </el-button>
@@ -376,8 +378,8 @@ onMounted(() => {
               <el-button
                 size="small"
                 type="primary"
-                @click="viewMarketChart(row.stock_code)"
                 style="margin-right: 5px;"
+                @click="viewMarketChart(row.stock_code)"
               >
                 查看行情
               </el-button>
@@ -405,7 +407,10 @@ onMounted(() => {
       </el-card>
 
       <!-- 自选股票列表 -->
-      <el-card class="favorite-list">
+      <el-card
+        v-show="isLoggedIn" v-loading="favoriteLoading"
+        class="favorite-list"
+      >
         <template #header>
           <div class="list-title">
             自选列表
@@ -427,8 +432,8 @@ onMounted(() => {
               <el-button
                 size="small"
                 type="primary"
-                @click="viewMarketChart(row.stock_code)"
                 style="margin-right: 5px;"
+                @click="viewMarketChart(row.stock_code)"
               >
                 查看行情
               </el-button>
