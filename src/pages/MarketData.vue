@@ -283,7 +283,8 @@ async function fetchStocks() {
 
 onMounted(() => {
   fetchPaginatedStocks()
-  fetchFavoriteStocks()
+  if (isLoggedIn.value)
+    fetchFavoriteStocks()
   // 监听storage事件实现多标签页同步
   window.addEventListener('storage', (e) => {
     if (e.key === 'stockFavorites') {
