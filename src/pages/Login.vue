@@ -87,7 +87,7 @@ onMounted(() => {
 <!--    <div class="login-box max-w-md w-full border border-gray-700 rounded-lg bg-gray-800 p-8 shadow-xl">-->
     <div class="login-box max-w-md w-full border border-gray-700 rounded-lg p-8 shadow-xl">
       <div class="mb-8 text-center">
-        <h2 class="text-3xl text-white font-bold">
+        <h2 class="text-3xl  font-bold">
           StockVision
         </h2>
         <div class="mx-auto mt-2 h-1 w-20 from-blue-600 to-indigo-800 bg-gradient-to-r" />
