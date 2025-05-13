@@ -34,7 +34,7 @@ function validatePass(rule, value, callback) {
 const rules = {
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
-    // { min: 3, max: 20, message: '长度在 3 到 20 个字符', trigger: 'blur' },
+    { min: 3, max: 20, message: '长度在 3 到 20 个字符', trigger: 'blur' },
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
@@ -45,7 +45,7 @@ const rules = {
   ],
   email: [
     { required: true, message: '请输入邮箱地址', trigger: 'blur' },
-    // { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' },
+    { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' },
   ],
   phone: [
     { required: true, message: '请输入手机号', trigger: 'blur' },
@@ -74,7 +74,8 @@ async function handleRegister() {
         })
 
         ElMessage.success('注册成功，请登录')
-        router.push('/login')
+        // 成功后重定向到登录页面
+        await router.push('/login')
       }
       catch (error) {
         console.error('注册出错:', error)
@@ -101,9 +102,9 @@ onMounted(() => {
 
 <template>
   <div class="login-container min-h-screen flex items-center justify-center">
-    <div class="login-box max-w-md w-full border border-gray-700 rounded-lg bg-gray-800 p-8 shadow-xl">
+    <div class="login-box max-w-md w-full border border-gray-700 rounded-lg  p-8 shadow-xl">
       <div class="mb-8 text-center">
-        <h2 class="text-3xl text-white font-bold">
+        <h2 class="text-3xl font-bold">
           StockVision
         </h2>
         <div class="mx-auto mt-2 h-1 w-20 from-blue-600 to-indigo-800 bg-gradient-to-r" />
