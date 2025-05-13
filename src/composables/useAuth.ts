@@ -6,6 +6,7 @@ const STORAGE_KEYS = {
   TOKEN: 'token',
   USER_ID: 'userId',
   USERNAME: 'username',
+  BALANCE: 'userBalance',
   LAST_VISITED_PATH: 'lastVisitedPath',
   STOCK_FAVORITES: 'stockFavorites',
 } as const
@@ -21,6 +22,7 @@ export function useAuth() {
   const isLoggedIn = ref(false)
   const userId = ref<string | number | null>(null)
   const username = ref('')
+  const balance = ref<string | number | null>(null)
   const lastVisitedPath = ref('/')
 
   /**
@@ -30,18 +32,22 @@ export function useAuth() {
     const token = localStorage.getItem(STORAGE_KEYS.TOKEN)
     const storedUserId = localStorage.getItem(STORAGE_KEYS.USER_ID)
     const storedUsername = localStorage.getItem(STORAGE_KEYS.USERNAME)
+    const storedBalance = localStorage.getItem(STORAGE_KEYS.BALANCE)
 
     if (token && storedUserId && storedUsername) {
       isLoggedIn.value = true
       userId.value = storedUserId
       username.value = storedUsername
+      if (storedBalance) {
+        balance.value = Number.parseFloat(storedBalance)
+      }
     }
     else {
       isLoggedIn.value = false
       userId.value = null
       username.value = ''
+      balance.value = null
     }
-    console.log(isLoggedIn.value)
   }
 
   /**
@@ -61,18 +67,32 @@ export function useAuth() {
   }
 
   /**
+   * 更新完整的用户信息
+   * @param userInfoData - 包含余额等详细信息的用户对象
+   */
+  const updateUserFullInfo = (userInfoData: { balance?: number | string, email?: string, phone?: string /* 其他字段 */ }) => {
+    if (userInfoData.balance !== undefined) {
+      const newBalance = Number.parseFloat(String(userInfoData.balance))
+      localStorage.setItem(STORAGE_KEYS.BALANCE, String(newBalance))
+      balance.value = newBalance
+    }
+  }
+
+  /**
    * 清除登录信息
    */
   const clearLoginInfo = () => {
     localStorage.removeItem(STORAGE_KEYS.TOKEN)
     localStorage.removeItem(STORAGE_KEYS.USER_ID)
     localStorage.removeItem(STORAGE_KEYS.USERNAME)
+    localStorage.removeItem(STORAGE_KEYS.BALANCE)
     localStorage.removeItem(STORAGE_KEYS.LAST_VISITED_PATH)
     localStorage.removeItem(STORAGE_KEYS.STOCK_FAVORITES)
 
     isLoggedIn.value = false
     userId.value = null
     username.value = ''
+    balance.value = null
   }
 
   /**
@@ -139,8 +159,10 @@ export function useAuth() {
     isLoggedIn: computed(() => isLoggedIn.value),
     userId: computed(() => userId.value),
     username: computed(() => username.value),
+    balance: computed(() => balance.value),
     lastVisitedPath,
     setLoginInfo,
+    updateUserFullInfo,
     clearLoginInfo,
     logout,
     saveLastVisitedPath,

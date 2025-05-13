@@ -13,12 +13,14 @@ definePage({
   },
 })
 
-const { logout } = useAuth()
+const { logout, userId: authUserId, updateUserFullInfo, balance: authBalance } = useAuth()
 
 interface User {
   username: string
   email: string
   phone: string
+  balance: number | string
+  registerTime: Date
 }
 
 interface PasswordForm {
@@ -27,13 +29,15 @@ interface PasswordForm {
   confirmPassword: string
 }
 const router = useRouter()
-const { checkAuth, userId: authUserId } = useAuth()
+const { checkAuth } = useAuth()
 
 // 用户信息状态
 const userInfo = ref<User>({
   username: '',
   email: '',
   phone: '',
+  balance: 0,
+  registerTime: new Date(),
 })
 const loading = ref(true)
 const error = ref('')
@@ -79,6 +83,7 @@ async function fetchUserInfo() {
     const response = await axios.get(`/api/v1/users/${authUserId.value}`)
     if (response.data.code === 200) {
       userInfo.value = response.data.data
+      updateUserFullInfo(response.data.data)
     }
     else {
       throw new Error(response.data.message || '获取用户信息失败')
@@ -120,7 +125,8 @@ async function handleUpdatePassword(formEl: FormInstance | undefined) {
         }
 
         const response = await axios.put('/api/v1/users/update-password', {
-          userId: Number.parseInt(authUserId.value),
+          // ID type
+          userId: authUserId.value,
           oldPassword: passwordForm.value.oldPassword,
           newPassword: passwordForm.value.newPassword,
         })
@@ -207,6 +213,17 @@ onUnmounted(() => {
         </el-descriptions-item>
         <el-descriptions-item label="手机号">
           {{ userInfo.phone }}
+        </el-descriptions-item>
+        <el-descriptions-item label="账户余额">
+          <el-statistic
+            :value="authBalance !== null ? Number(authBalance) : 0"
+            :precision="2"
+            prefix="¥"
+            value-style="font-size: 14px"
+          />
+        </el-descriptions-item>
+        <el-descriptions-item label="注册时间">
+          {{ userInfo.registerTime ? new Date(userInfo.registerTime).toLocaleString() : '-' }}
         </el-descriptions-item>
       </el-descriptions>
 

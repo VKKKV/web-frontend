@@ -3,6 +3,7 @@ import { Check } from '@element-plus/icons-vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, ref } from 'vue'
+import { get, post } from '~/api' // 确保导入 post 方法
 import { useAuth } from '~/composables/useAuth.ts'
 
 definePage({
@@ -12,7 +13,7 @@ definePage({
   },
 })
 
-const { userId } = useAuth()
+const { userId, updateUserFullInfo } = useAuth()
 const stockName = ref()
 const loading = ref(false)
 const tradeHistory = ref([])
@@ -43,6 +44,8 @@ const userHoldings = ref([
   },
 ])
 
+// 买入 (BUY) 逻辑: 新的 totalCost 是旧的 totalCost 加上当前交易的成本 (trade.price * trade.quantity)。然后基于新的 totalCost 和新的 quantity 重新计算 avgPrice。
+// 卖出 (SELL) 逻辑: 当部分股票被卖出后，avgPrice （平均成本）通常保持不变，但 totalCost 需要根据剩余的 quantity 和 avgPrice 进行更新，即 totalCost = avgPrice * quantity。如果全部卖出，则 totalCost 和 avgPrice 都应归零。
 // 计算持仓市值和盈亏
 const holdingValues = computed(() => {
   return userHoldings.value.map((holding) => {
@@ -150,22 +153,42 @@ async function submitOrder() {
       price: form.value.price,
       orderType: form.value.orderType,
     }
-    const response = await axios.post('/api/v1/trade/order', orderData)
-    if (response.data.code === 200) {
-      ElMessage.success('委托提交成功')
+    const response = await post('/api/v1/trade/order', orderData)
+    if (response.code !== 200) {
+      ElMessage.error(`委托提交失败: ${response.data.message}`)
+      return
+    }
+    ElMessage.success('委托提交成功')
 
-      // 刷新交易历史
-      await fetchTradeHistory()
-      await fetchUserHoldings()
+    // 刷新交易历史和持仓
+    await fetchTradeHistory()
+    await fetchUserHoldings()
+
+    // 刷新用户余额信息
+    try {
+      if (userId.value) {
+        const userInfoResult = await get(`/api/v1/users/${userId.value}`)
+        if (userInfoResult.code === 200) {
+          updateUserFullInfo(userInfoResult.data)
+        }
+        else {
+          console.error('获取用户信息失败:', userInfoResult.message)
+          ElMessage.warning('获取用户信息失败')
+        }
+      }
+      else {
+        console.warn('User ID not available, cannot refresh balance.')
+        ElMessage.warning('用户ID不可用，无法刷新余额')
+      }
+    }
+    catch (fetchError) {
+      console.error('刷新用户余额失败:', fetchError)
+      ElMessage.error('刷新用户余额失败')
+      // 即使刷新余额失败，订单也已提交
     }
   }
   catch (error) {
     console.error('提交委托失败:', error)
-    ElMessage.error(
-      error.response?.data?.message
-        ? String(error.response.data.message)
-        : '提交委托失败',
-    )
   }
   finally {
     loading.value = false
@@ -184,7 +207,7 @@ async function handleSymbolChange(symbol) {
     }
   }
   catch (error) {
-    console.error('获取股票价格失败:', error)
+    ElMessage.error('获取股票价格失败:', error)
   }
 }
 
@@ -200,30 +223,53 @@ async function fetchUserHoldings() {
       if (!holdingsMap[trade.symbol]) {
         holdingsMap[trade.symbol] = {
           symbol: trade.symbol,
-          name: '',
+          name: '', // 将在 updateHoldingsPrice 中获取
           quantity: 0,
-          available: 0,
+          available: 0, // 'available' 字段的更新逻辑可能需要审阅，暂时与 quantity 一致
           avgPrice: 0,
-          totalCost: 0,
+          totalCost: 0, // 初始化总成本
           currentPrice: 0,
           profit: 0,
         }
       }
       const holding = holdingsMap[trade.symbol]
+
       if (trade.side === 'BUY') {
         // 买入操作：增加持仓
-        const newQuantity = holding.quantity + trade.quantity
-        holding.totalCost = holding.totalCost * holding.quantity + trade.price * trade.quantity
-        holding.quantity = newQuantity
-        holding.avgPrice = holding.totalCost / newQuantity
+        const costOfThisTrade = trade.price * trade.quantity
+        const quantityFromThisTrade = trade.quantity
+
+        // 累加总成本
+        holding.totalCost += costOfThisTrade
+        // 累加数量
+        holding.quantity += quantityFromThisTrade
+
+        // 重新计算平均价格
+        if (holding.quantity > 0) {
+          holding.avgPrice = holding.totalCost / holding.quantity
+        }
+        else {
+          // 如果买入后数量仍为0或负数（异常情况），则重置成本和价格
+          holding.avgPrice = 0
+          holding.totalCost = 0
+          if (holding.quantity < 0)
+            holding.quantity = 0 // 确保数量不为负
+        }
       }
       else if (trade.side === 'SELL') {
         // 卖出操作：减少持仓
         holding.quantity -= trade.quantity
+
         if (holding.quantity <= 0) {
-          // 如果全部卖出，则清空平均价格
+          // 如果全部卖出或卖超，则清空持仓信息
+          holding.quantity = 0 // 确保数量不为负
           holding.avgPrice = 0
           holding.totalCost = 0
+        }
+        else {
+          // 如果部分卖出，平均成本不变，总成本按剩余数量和平均成本更新
+          // 注意：此处的 holding.avgPrice 是卖出前的平均成本，是正确的
+          holding.totalCost = holding.avgPrice * holding.quantity
         }
       }
     })
@@ -241,7 +287,7 @@ async function fetchUserHoldings() {
     await updateHoldingsPrice()
   }
   catch (error) {
-    console.error('计算持仓失败:', error)
+    ElMessage.error('计算持仓失败:', error)
   }
 }
 
@@ -271,7 +317,7 @@ async function updateHoldingsPrice() {
     }
   }
   catch (error) {
-    console.error('更新价格失败:', error)
+    ElMessage.error('更新价格失败:', error)
   }
 }
 
@@ -286,8 +332,6 @@ function handleSell(symbol) {
       price: holding.currentPrice,
       quantity: 100, // 默认100股
     }
-    // 可以滚动到交易面板
-    document.querySelector('.trade-panel')?.scrollIntoView({ behavior: 'smooth' })
   }
 }
 
@@ -458,7 +502,7 @@ onMounted(() => {
           </el-table-column>
 
           <el-table-column
-            label="成本价"
+            label="均价"
             width="120"
           >
             <template #default="{ row }">
@@ -567,7 +611,7 @@ onMounted(() => {
             min-width="140"
           />
           <el-table-column
-            label="总买入"
+            label="总金额"
             min-width="140"
           >
             <template #default="{ row }">

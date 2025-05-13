@@ -3,11 +3,11 @@ import { Lock, User } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { post } from '../api'
+import { get, post } from '../api'
 import { useAuth } from '../composables/useAuth'
 
 const router = useRouter()
-const { setLoginInfo, redirectAfterLogin } = useAuth()
+const { setLoginInfo, redirectAfterLogin, updateUserFullInfo } = useAuth()
 
 // 登录表单数据
 const loginForm = reactive({
@@ -43,12 +43,25 @@ async function handleLogin() {
           password: loginForm.password,
         })
 
-        // 保存登录信息
+        // 保存登录基本信息 (token, userId, username)
         setLoginInfo(
           result.data.token,
           result.data.userId,
           result.data.username,
         )
+
+        // 获取完整的用户信息，包括余额
+        try {
+          const userInfoResult = await get(`/api/v1/users/${result.data.userId}`)
+          if (userInfoResult.code === 200) {
+            updateUserFullInfo(userInfoResult.data) // 更新全局用户信息，包括余额
+          }
+        }
+        catch (fetchError) {
+          console.error('获取用户信息失败:', fetchError)
+          // 即使获取详细信息失败，登录本身也算成功了，可以仅记录错误
+          ElMessage.warning('登录成功，但获取详细信息失败，部分功能可能受限')
+        }
 
         ElMessage.success('登录成功')
 
@@ -80,7 +93,7 @@ function goToRegister() {
   <div class="login-container min-h-screen flex items-center justify-center">
     <div class="login-box max-w-md w-full border border-gray-700 rounded-lg p-8 shadow-xl">
       <div class="mb-8 text-center">
-        <h2 class="text-3xl  font-bold">
+        <h2 class="text-3xl font-bold">
           StockVision
         </h2>
         <div class="mx-auto mt-2 h-1 w-20 from-blue-600 to-indigo-800 bg-gradient-to-r" />
