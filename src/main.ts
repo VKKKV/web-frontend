@@ -2,9 +2,9 @@ import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 
 import ElementPlus from 'element-plus'
 import { createApp } from 'vue'
-import App from './App.vue'
+import router from '~/router/router'
 
-import router from './router'
+import App from './App.vue'
 import 'element-plus/dist/index.css'
 import '~/styles/index.scss'
 
