@@ -6,6 +6,13 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '~/composables/useAuth'
 
+definePage({
+  meta: {
+    // 定义元数据，标记该路由需要认证
+    requiresAuth: true,
+  },
+})
+
 const { logout } = useAuth()
 
 interface User {

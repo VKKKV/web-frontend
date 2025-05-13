@@ -8,7 +8,7 @@ const router = createRouter({
   routes,
 })
 
-// ✅ 路由守卫（和标准 vue-router 一样）
+// 路由守卫
 router.beforeEach((to, from, next) => {
   // 获取登录状态
   const token = localStorage.getItem('token')
@@ -19,7 +19,7 @@ router.beforeEach((to, from, next) => {
     localStorage.setItem('lastVisitedPath', from.path)
   }
 
-  // 需要登录的页面（用 meta 标记）
+  // 需要登录的页面 meta 标记
   if (to.meta.requiresAuth && !isLoggedIn) {
     ElMessage.warning('请先登录')
     return next('/Login')

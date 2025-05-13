@@ -3,7 +3,14 @@ import { Check } from '@element-plus/icons-vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, ref } from 'vue'
-import { useAuth } from '~/composables/useAuth.js'
+import { useAuth } from '~/composables/useAuth.ts'
+
+definePage({
+  meta: {
+    // 定义元数据，标记该路由需要认证
+    requiresAuth: true,
+  },
+})
 
 const { userId } = useAuth()
 const stockName = ref()
@@ -560,8 +567,8 @@ onMounted(() => {
             min-width="140"
           />
           <el-table-column
-              label="总买入"
-              min-width="140"
+            label="总买入"
+            min-width="140"
           >
             <template #default="{ row }">
               {{ (row.price * row.quantity).toFixed(2) }}
