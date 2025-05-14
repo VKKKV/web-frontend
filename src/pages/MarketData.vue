@@ -208,6 +208,9 @@ async function fetchFavoriteStocks() {
       s._dataStale = true
     })
   }
+  finally {
+    favoriteLoading.value = false
+  }
 }
 
 // 辅助方法：添加本地时间戳
